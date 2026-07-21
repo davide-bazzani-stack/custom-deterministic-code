@@ -29,14 +29,14 @@ Rules for every implementation step:
 ### P0.1 Establish the safety net
 
 - [ ] Establish an immutable source baseline before implementation.
-  - [ ] Restore or initialize usable version-control metadata; the present `.git`
-    directory is empty.
+  - [x] Restore or initialize usable version-control metadata.
   - [ ] Record compiler/version, flags, and hashes of all input decks used for
     numerical baselines.
 - [ ] Split the CMake build into a production `fvm_core` library and a thin
   executable without changing runtime behavior.
+  - [x] Build the production modules as `fvm_core` and link the thin executable.
   - [ ] Link tests and the executable to the same library target.
-  - [ ] Use explicit source lists; do not recursively glob the dormant `HGCMFD/`
+  - [x] Use explicit source lists; do not recursively glob the dormant `HGCMFD/`
     copy.
 - [ ] Create the separate singular `test/` directory using the reference TestDrive
   collector/driver logic.
@@ -339,8 +339,7 @@ deferred. Do not perform it while the input freeze is active.
   `__pycache__`, generated output, plots, and logs.
 - [ ] Resolve the leading-space duplicate ` Coordinates_Vert.out` and other stale
   outputs only after provenance/retention decisions are made.
-- [ ] Replace `builder.sh` with a fail-fast, documented build/test entry point or
-  make it fail fast and call the canonical presets.
+- [x] Make `builder.sh` fail fast and call the canonical Debug/Release presets.
 
 ## Completed and verified in the current source
 
