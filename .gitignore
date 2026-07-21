@@ -1,0 +1,41 @@
+# Generated build trees
+/build/
+/cmake-build-*/
+CMakeUserPresets.json
+
+# CMake-generated files from in-source builds
+/CMakeCache.txt
+/CMakeFiles/
+/Makefile
+/cmake_install.cmake
+/compile_commands.json
+
+# Fortran compiler and linker artifacts
+*.mod
+*.smod
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated runtime data and scratch files
+/output/**
+/temp/**
+
+# Editor and operating-system metadata
+.vscode/
+.idea/
+*~
+*.swp
+.DS_Store
+Thumbs.db

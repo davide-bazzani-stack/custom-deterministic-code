@@ -1,0 +1,26 @@
+# lpCMFD mimick problem
+
+% Rect
+2.500 2.500
+0.0     0.0
+5.000   0.0
+5.000 5.000
+0.0   5.000
+@ Moder
+!box
+
+# FA
+% Rect
+2.500 2.500
+2.000 2.000
+3.000 2.000
+3.000 3.000
+2.000 3.000
+@ Fuel
+
+
+[BC]	# [Square] Maintain the same number of characters 
+B  = 0.0
+R  = 0.0
+T  = 0.0
+L  = 0.0

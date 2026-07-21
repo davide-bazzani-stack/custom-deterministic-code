@@ -1,0 +1,21 @@
+# SMR Problem data
+# THE VERTICES MUST BE CLOSE ONE TO THE OTHER COUNTERCLOCKWISE!
+
+# Reactor 'box'
+% Rect
+120.0 120.0
+0.0   0.0
+240.0 0.0
+240.0 240.0
+0.0   240.0
+@ Moder
+!box
+
+# FA5
+% Rect
+120.0 120.0
+100.0 100.0
+140.0 100.0
+140.0 140.0
+100.0 140.0
+@ Fuel

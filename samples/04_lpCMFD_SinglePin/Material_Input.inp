@@ -1,0 +1,49 @@
+# Material data input
+n_mat = 2
+n_g = 2
+   
+% mat 1
+Name
+Fuel
+XS_TO =
+         9.000
+XS_TR =
+         9.000
+XS_AB =
+         0.900
+XS_nF =
+         1.000
+Chi = 
+         1.000
+XS_kF =
+         1.000
+XS_RM = 
+         0.000
+XS_D =
+         0.000
+XS_SC =
+         8.100
+   
+   
+% mat 2
+Name
+Moder
+XS_TO =
+        10.000
+XS_TR =
+        10.000
+XS_AB =
+         1.000
+XS_nF =
+         0.990
+Chi = 
+         1.000
+XS_kF =
+         0.990
+XS_RM = 
+         0.000
+XS_D =
+         0.000
+XS_SC =
+         9.000
+	 

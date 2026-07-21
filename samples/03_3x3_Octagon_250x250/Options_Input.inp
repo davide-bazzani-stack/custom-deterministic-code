@@ -1,0 +1,87 @@
+ # Simulation options (FVM code)
+
+#==========================================================
+% Local
+
+mesh	# [Quad/Tri_Iso/Tri_Eq] Selection of the fine-mesh base type: only squared - Quad - and isosceles - Tri_Iso - have been implemented so far.
+Tri_Iso
+
+nx	# Number of meshes along x. Must be always provided
+50
+
+ny	# Number of meshes along y. Must be always provided for Quad, while it is ignored for Tri_Iso, as ny(Tri_Iso) = 2*nx
+100
+
+ng	# Number of energy groups. Must be always provided, but if no condensation is sought set it equal to n_g_loc
+2
+
+solv_tol  # linear solver tolerance
+1e-12
+
+in_P_tol	# Group sweeping (Phi) tolerance (inner iterations)
+1e-06
+
+out_k_tol	# k tolerance (outer iterations)
+1e-06
+
+out_S_tol	# Source tolerance (outer iterations)
+1e-06
+
+solv_max_iter # linear solver max iterations  
+1000
+ 
+in_max_iter	# Maximum inner iterations
+1000
+
+out_max_iter	# Maximum outer iterations
+5000
+
+SOR	# [Y/N] to activate the SOR. If selected - Y - provide the number in the line after in (0.d0, 2.d0], while if 'N' the number is neglected
+N
+0.2
+
+#==========================================================
+
+
+#==========================================================
+% Acceleration	# [None/CMFD/pCMFD/lpCMFD/HGCMFD]
+HGCMFD
+
+nx	# Number of meshes along x. Must be always provided
+3
+
+ny	# Number of meshes along y. Must be always provided
+3
+
+ng	# Number of energy groups. Must be always provided, but if no condensation is sought set it equal to n_g_loc
+1
+
+solv_tol  # linear solver tolerance
+1e-08
+
+in_P_tol	# Group sweeping (Phi) tolerance (inner iterations)
+1e-08
+
+out_k_tol	# k tolerance (outer iterations)
+1e-09
+
+out_S_tol	# Source tolerance (outer iterations)
+1e-09
+
+solv_max_iter # linear solver max iterations
+100
+ 
+in_max_iter	# Maximum inner iterations
+1000
+
+out_max_iter	# Maximum outer iterations
+100000
+
+dxdl
+5.0	# dl
+5.0	# dx
+
+SOR
+N
+1.25
+#==========================================================
