@@ -1,17 +1,18 @@
 module BiCGSTAB_Algorithm 
+    use precision_kinds, only: prec
+    
 	    implicit none
-	integer, parameter :: dp_var = kind(1.d0)
     
     contains
     
     ! Made for traditional pentadiagonal matrices. If a different matrix is sought, modify the matvect_penta function
     subroutine BiCGSTAB_Classic(n_x, n, a, b, c, d, e, rhs, x, tol, max_iter, info) 
         integer, intent(in) :: n_x, n, max_iter
-        real(dp_var), intent(in) :: a(:), b(:), c(:), d(:), e(:), rhs(:), tol
-        real(dp_var), intent(inout) :: x(:)
+        real(prec), intent(in) :: a(:), b(:), c(:), d(:), e(:), rhs(:), tol
+        real(prec), intent(inout) :: x(:)
         integer, intent(out) :: info
-        real(dp_var), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
-        real(dp_var) :: alpha, beta, omega, rho, rho_old, error, t1, t2, t3, t4
+        real(prec), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
+        real(prec) :: alpha, beta, omega, rho, rho_old, error, t1, t2, t3, t4
         integer :: k
         
         allocate(r(n))
@@ -28,11 +29,11 @@ module BiCGSTAB_Algorithm
 
         r=rhs-r		! b array in Ax=b (known)
         r_old=r
-        rho_old=1.d0
-        alpha=1.d0	 ! to make beta = 0 and thus p = r for the first iteration
-        omega=1.d0
-        v=0.d0
-        p=0.d0
+        rho_old=1.e0_prec
+        alpha=1.e0_prec	 ! to make beta = 0 and thus p = r for the first iteration
+        omega=1.e0_prec
+        v=0.e0_prec
+        p=0.e0_prec
         
         IterativeSolution: do k=1,max_iter
             
@@ -76,11 +77,11 @@ module BiCGSTAB_Algorithm
         
     subroutine matvect_penta(n_x, n, a, b, c, d, e, x, y) 
         integer, intent(in) :: n_x, n
-        real(dp_var), intent(in) :: a(:), b(:), c(:), d(:), e(:), x(:)
-        real(dp_var), intent(out) :: y(:)
+        real(prec), intent(in) :: a(:), b(:), c(:), d(:), e(:), x(:)
+        real(prec), intent(out) :: y(:)
         integer :: i
         
-        y=0.d0
+        y=0.e0_prec
         
         do i=2,n-1
             y(i)=y(i)+b(i)*x(i)+a(i)*x(i-1)+c(i)*x(i+1)
@@ -100,11 +101,11 @@ module BiCGSTAB_Algorithm
     
     subroutine BiCGSTAB_EqTri(n_x, n_y, a, b, c, d, e, rhs, x, tol, max_iter, info) 
         integer, intent(in) :: n_x, n_y, max_iter
-        real(dp_var), intent(in) :: a(:), b(:), c(:), d(:), e(:), rhs(:), tol
-        real(dp_var), intent(inout) :: x(:)
+        real(prec), intent(in) :: a(:), b(:), c(:), d(:), e(:), rhs(:), tol
+        real(prec), intent(inout) :: x(:)
         integer, intent(out) :: info
-        real(dp_var), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
-        real(dp_var) :: alpha, beta, omega, rho, rho_old, error, t1, t2, t3, t4
+        real(prec), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
+        real(prec) :: alpha, beta, omega, rho, rho_old, error, t1, t2, t3, t4
         integer :: k, n
         
         n=n_x*n_y
@@ -123,11 +124,11 @@ module BiCGSTAB_Algorithm
         
         r=rhs-r		! b array in Ax=b (known)
         r_old=r
-        rho_old=1.d0
-        alpha=1.d0	 ! to make beta = 0 and thus p = r for the first iteration
-        omega=1.d0
-        v=0.d0
-        p=0.d0
+        rho_old=1.e0_prec
+        alpha=1.e0_prec	 ! to make beta = 0 and thus p = r for the first iteration
+        omega=1.e0_prec
+        v=0.e0_prec
+        p=0.e0_prec
         
         IterativeSolution: do k=1,max_iter
             
@@ -171,8 +172,8 @@ module BiCGSTAB_Algorithm
     
     subroutine matvect_penta_EqTri(n_x, n, a, b, c, d, e, x, y) 
         integer, intent(in) :: n_x, n
-        real(dp_var), intent(in) :: a(n), b(n), c(n), d(n), e(n), x(n)
-        real(dp_var), intent(out) :: y(n)
+        real(prec), intent(in) :: a(n), b(n), c(n), d(n), e(n), x(n)
+        real(prec), intent(out) :: y(n)
         integer :: i
         
         y=b*x
@@ -198,11 +199,11 @@ module BiCGSTAB_Algorithm
     
     subroutine BiCGSTAB_TriIso(n_x, n, a, b, c, d, e, rhs, x, tol, max_iter, info) 
         integer, intent(in) :: n_x, n, max_iter
-        real(dp_var), intent(in) :: a(:), b(:), c(:), d(:), e(:), rhs(:), tol
-        real(dp_var), intent(inout) :: x(:)
+        real(prec), intent(in) :: a(:), b(:), c(:), d(:), e(:), rhs(:), tol
+        real(prec), intent(inout) :: x(:)
         integer, intent(out) :: info
-        real(dp_var), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
-        real(dp_var) :: alpha, beta, omega, rho, rho_old, error, t1, t2, t3, t4
+        real(prec), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
+        real(prec) :: alpha, beta, omega, rho, rho_old, error, t1, t2, t3, t4
         integer :: k
                 
         allocate(r(n))
@@ -219,11 +220,11 @@ module BiCGSTAB_Algorithm
         
         r=rhs-r		! b array in Ax=b (known)
         r_old=r
-        rho_old=1.d0
-        alpha=1.d0	 ! to make beta = 0 and thus p = r for the first iteration
-        omega=1.d0
-        v=0.d0
-        p=0.d0
+        rho_old=1.e0_prec
+        alpha=1.e0_prec	 ! to make beta = 0 and thus p = r for the first iteration
+        omega=1.e0_prec
+        v=0.e0_prec
+        p=0.e0_prec
         
         IterativeSolution: do k=1,max_iter
             
@@ -267,8 +268,8 @@ module BiCGSTAB_Algorithm
     
     subroutine matvect_penta_TriIso(n_x, n, a, b, c, d, e, x, y) 
         integer, intent(in) :: n_x, n
-        real(dp_var), intent(in) :: a(n), b(n), c(n), d(n), e(n), x(n)
-        real(dp_var), intent(out) :: y(n)
+        real(prec), intent(in) :: a(n), b(n), c(n), d(n), e(n), x(n)
+        real(prec), intent(out) :: y(n)
         integer :: i
         
         y=b*x

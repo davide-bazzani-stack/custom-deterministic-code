@@ -326,6 +326,15 @@ deferred. Do not perform it while the input freeze is active.
   presence/default policy, with compatibility tests.
 - [ ] Version any input syntax change and retain a documented compatibility path.
 
+### P3.3 Transition input data from AoS to SoA
+
+- [ ] Convert input data from array-of-structures (AoS) to
+  structure-of-arrays (SoA) immediately after input reading.
+- [ ] If practical, construct the SoA representation directly while parsing to
+  avoid allocating and converting an intermediate AoS representation.
+- [ ] Define an HDF5 table/dataset schema for postprocessing data and intermediate
+  results, with compatibility for a future results visualizer.
+
 ## P4 — Repository hygiene and retirement decisions
 
 - [ ] Decide whether CMake is authoritative and whether the stale `.vfproj`, `.u2d`,

@@ -1,4 +1,5 @@
-module Service_Fcns 
+module Service_Fcns
+    use precision_kinds, only: prec
     use Variables
     use IO_module, only : files
     use iso_fortran_env, only : output_unit, error_unit
@@ -11,14 +12,14 @@ module Service_Fcns
     
         subroutine Flux_Vol_Normalization(n_g, V, Phi) 
             integer, intent(in) :: n_g
-            real(dp), intent(in) :: V(:)
-            real(dp), intent(inout) :: Phi(:)
+            real(prec), intent(in) :: V(:)
+            real(prec), intent(inout) :: Phi(:)
 
             integer :: i, j, g, g_red, n
-            real(dp) :: tmp
+            real(prec) :: tmp
 
             n=size(V)
-            tmp=0.d0
+            tmp=0.e0_prec
 
             do g=1,n_g
                 g_red=(g-1)*n
@@ -26,18 +27,18 @@ module Service_Fcns
             end do
             tmp=tmp/sum(V) !dble(n_mesh*n_g) ! Average flux counting all the groups
 
-            Phi=Phi*1.d0/tmp
+            Phi=Phi*1.e0_prec/tmp
         end subroutine Flux_Vol_Normalization
 
         subroutine Flux_lo_Vol_Normalization(n_tot, n_red, n_g, labels, V, Phi) 
             integer, intent(in) :: n_tot, n_g, n_red, labels(:)
-            real(dp), intent(in) :: V(:)
-            real(dp), intent(inout) :: Phi(:)
+            real(prec), intent(in) :: V(:)
+            real(prec), intent(inout) :: Phi(:)
 
             integer :: i, l, g, g_red, l_red
-            real(dp) :: tmp
+            real(prec) :: tmp
 
-            tmp=0.d0
+            tmp=0.e0_prec
             do g=1,n_g
                 l_red=0
                 do l=1, n_tot
@@ -50,14 +51,14 @@ module Service_Fcns
             end do
             tmp=tmp/sum(V) !dble(n_mesh*n_g) ! Average flux counting all the groups
 
-            Phi=Phi*1.d0/tmp
+            Phi=Phi*1.e0_prec/tmp
         end subroutine Flux_lo_Vol_Normalization
 
         subroutine Output_Converter(n_g, n_x, Mesh_Position, Flux_in, Flux_out) 
             integer, intent(in) :: n_g, n_x, Mesh_Position(:)
-            real(dp), intent(in) :: Flux_in(:) 
+            real(prec), intent(in) :: Flux_in(:)
 
-            real(dp), allocatable, intent(out) :: Flux_out(:)
+            real(prec), allocatable, intent(out) :: Flux_out(:)
 
 
             integer :: l, g, g_red, g_tot, n, n_tot, n_red
@@ -66,7 +67,7 @@ module Service_Fcns
             n_red=count(Mesh_Position>0)
             allocate(Flux_out(n_tot*n_g))
 
-            Flux_out=0.d0
+            Flux_out=0.e0_prec
             do g=1, n_g
                 g_tot=(g-1)*n_tot
                 g_red=(g-1)*n_red
@@ -83,10 +84,10 @@ module Service_Fcns
             use IO_module, only : files
 
             integer, intent(in) :: n_g, n_x, n_y, n_tot, univ(:)
-            real(dp), intent(in) :: Flux(:), kFi_XS(:), V_lo(:)
+            real(prec), intent(in) :: Flux(:), kFi_XS(:), V_lo(:)
 
             integer :: g, j, l, g_tot
-            real(dp), allocatable :: Power(:)
+            real(prec), allocatable :: Power(:)
 
             ! - Universes 
             do l=1, n_tot
@@ -127,7 +128,7 @@ module Service_Fcns
 
             ! --> Power file 
             allocate(Power(n_x*n_y))
-            Power=0.d0
+            Power=0.e0_prec
             do g=1, n_g
                 g_tot=(g-1)*n_tot
                 Power=Power+Flux(g_tot+1:g_tot+n_tot)*kFi_XS(g_tot+1:g_tot+n_tot)*V_lo
@@ -143,7 +144,7 @@ module Service_Fcns
             write(files%power,*) 
             write(files%power,*) 
 
-            Power=Power/(sum(Power)/count(Power>0.d0))
+            Power=Power/(sum(Power)/count(Power>0.e0_prec))
             write(files%power, '(A)') "Relative Power Profile"
             do j=1, n_y
                 write(files%power, '(100000ES21.13)') Power((j-1)*n_x+1:j*n_x)
@@ -162,9 +163,9 @@ module Service_Fcns
             ! The order of the vertices must be counter-clockwise
 
             integer :: i, n
-            real(dp), intent(in) :: vertices(:,:), point(:)
-            real(dp), allocatable :: vert(:,:)
-            real(dp), intent(out) :: dist(:)
+            real(prec), intent(in) :: vertices(:,:), point(:)
+            real(prec), allocatable :: vert(:,:)
+            real(prec), intent(out) :: dist(:)
 
             n=size(vertices,2)
 
@@ -183,9 +184,9 @@ module Service_Fcns
             ! The order of the vertices must be counter-clockwise
 
             integer :: i, n
-            real(dp), intent(in) :: vertices(:,:), point(:)
-            real(dp), allocatable :: vert(:,:), dist(:)
-            real(dp), intent(out) :: distance
+            real(prec), intent(in) :: vertices(:,:), point(:)
+            real(prec), allocatable :: vert(:,:), dist(:)
+            real(prec), intent(out) :: distance
 
             n=size(vertices,2)
 
@@ -208,8 +209,8 @@ module Service_Fcns
             ! The order of the vertices must be counter-clockwise
             
             integer :: i, n
-            real(dp), intent(in) :: vertices(:,:), point(:)
-            real(dp), allocatable :: vert(:,:), Signed_Area(:)
+            real(prec), intent(in) :: vertices(:,:), point(:)
+            real(prec), allocatable :: vert(:,:), Signed_Area(:)
             logical, intent(out) :: inside
             
             n=size(vertices,2)
@@ -226,7 +227,7 @@ module Service_Fcns
                 Signed_Area(i) = (vert(1,i+1)-vert(1,i))*(point(2)-vert(2,i))-(vert(2,i+1)-vert(2,i))*(point(1)-vert(1,i))
             end do
             
-            if (abs(sum(abs(Signed_Area))-abs(sum(Signed_Area)))<1.0d-12) inside= .TRUE. 
+            if (abs(sum(abs(Signed_Area))-abs(sum(Signed_Area)))<1.0e-12_prec) inside= .TRUE.
             
             deallocate(Signed_Area)
             deallocate(vert)
@@ -241,7 +242,7 @@ module Service_Fcns
                 type(Figure), allocatable, intent(in) :: Elem_det(:)
                 type(LO_geom), allocatable, intent(inout) :: LO_Mesh(:)
                 type(LO_coeff), allocatable, intent(inout) :: LO_Param(:)
-                real(dp), intent(in) :: dx_gh, dy_gh, dl_input, dx_input
+                real(prec), intent(in) :: dx_gh, dy_gh, dl_input, dx_input
 
                 ! Outputs
                 type(Options_Data), intent(out) :: Opt_gl
@@ -260,7 +261,7 @@ module Service_Fcns
 
 
                 integer :: flag_part, no_faces, g, g_tot
-                real(dp) :: dl, vert_temp(2,200)
+                real(prec) :: dl, vert_temp(2,200)
                 logical :: test
 
                 integer :: i, j, l, i_red, j_red, l_red, ii, jj, ll, t, t_tot, u, uu, n, m, nb, ios, n_elements, n_vert, box_mat_ID, lo_in_gl_meshes_x, lo_in_gl_meshes_y
@@ -284,7 +285,7 @@ module Service_Fcns
                     write(files%log,'(A)') 'Reading the coarse mesh input parameters...'
 
                     ! Custom HGCMFD zones 
-                    open(unit=130, file='CMFD_Grid.inp', status='old', action='read', iostat=ios)
+                    open(unit=130, file='input/CMFD_Grid.inp', status='old', action='read', iostat=ios)
 
                     ! Allocation and detection of the geometry details 
                     allocate(Elem_CMFD(Opt_gl%n_x*Opt_gl%n_y)) 
@@ -496,7 +497,7 @@ module Service_Fcns
 
 
                     ! Custom HGCMFD zones 
-                    open(unit=130, file='HGCMFD_Grid.inp', status='old', action='read', iostat=ios)
+                    open(unit=130, file='input/HGCMFD_Grid.inp', status='old', action='read', iostat=ios)
 
                     if (ios .NE. 0) then 
                         ! Elem_CMFD = Elem_det in case of missing file 
@@ -946,8 +947,8 @@ module Service_Fcns
 
                 ! Geometric parameters calculation 
                 do u=1, Opt_gl%n_tot
-                    GL_Mesh(u)%A_gl=0.d0
-                    GL_Mesh(u)%V_gl=0.d0
+                    GL_Mesh(u)%A_gl=0.e0_prec
+                    GL_Mesh(u)%V_gl=0.e0_prec
             allocate(GL_Mesh(u)%J_lo_gl_face(SIZE(GL_Mesh(u)%A_gl)))
                 end do
 
@@ -966,7 +967,7 @@ module Service_Fcns
                     if (no_faces==1) then   ! Circumference  
 
                         call Distance(Elem_CMFD(u)%centroid(1), Elem_CMFD(u)%centroid(2), Elem_CMFD(u)%vertices(1,1), Elem_CMFD(u)%vertices(2,1), dl)
-                        GL_Mesh(u)%A_gl(1)= atan(1.d0)*4.d0*dl**2.d0
+                        GL_Mesh(u)%A_gl(1)= atan(1.e0_prec)*4.e0_prec*dl**2.e0_prec
                     else ! n-sided polygon  
                         vert_temp(:,1:no_faces)=Elem_CMFD(u)%vertices(:,1:no_faces)
                         vert_temp(:,1+no_faces)=Elem_CMFD(u)%vertices(:,1)
@@ -1084,8 +1085,8 @@ module Service_Fcns
         end subroutine Accel_Ini
     
         subroutine Distance(x1, y1, x2, y2, dist) 
-            real(dp), intent(in) :: x1, y1, x2, y2
-            real(dp), intent(out) :: dist
+            real(prec), intent(in) :: x1, y1, x2, y2
+            real(prec), intent(out) :: dist
 
             dist = sqrt((x2 - x1)**2 + (y2 - y1)**2)
         end subroutine Distance
@@ -1095,14 +1096,14 @@ module Service_Fcns
             type(LO_geom), allocatable, intent(in) :: LO_Mesh(:)
             type(LO_coeff), allocatable, intent(in) :: LO_Param(:)
             type(GL_geom), allocatable, intent(in) :: GL_Mesh(:)
-            real(dp), allocatable, intent(in) :: Phi_lo(:)
-            real(dp), allocatable, intent(inout) :: Phi_gl(:)
+            real(prec), allocatable, intent(in) :: Phi_lo(:)
+            real(prec), allocatable, intent(inout) :: Phi_gl(:)
             type(XS_Data), intent(in) :: XS_lo
             type(XS_Data), intent(inout) :: XS_gl
 
             integer :: u, n, l, l_red, t, t_red, t_tot, tt, tt_red, tt_tot, g, g_red, g_tot, gg, gg_red, gg_tot, i, j
-            real(dp) :: temp
-            real(dp), allocatable :: Phi_int(:)
+            real(prec) :: temp
+            real(prec), allocatable :: Phi_int(:)
             type(XS_Data) :: XS_int
 
             ! Allocation and initialization 
@@ -1118,17 +1119,17 @@ module Service_Fcns
             allocate(  XS_int%Dif(Opt_gl%n_tot*Opt_gl%n_g))
             allocate(     Phi_int(Opt_gl%n_tot*Opt_gl%n_g))
 
-            XS_int%Tot=0.d0
-            XS_int%Tra=0.d0
-            XS_int%Absr=0.d0
-            XS_int%nuFis=0.d0
-            XS_int%Fis=0.d0
-            XS_int%Chi=0.d0
-            XS_int%Scatt=0.d0
-            XS_int%kFis=0.d0
-            XS_int%Rem=0.d0
-            XS_int%Dif=0.d0
-            Phi_int=0.d0
+            XS_int%Tot=0.e0_prec
+            XS_int%Tra=0.e0_prec
+            XS_int%Absr=0.e0_prec
+            XS_int%nuFis=0.e0_prec
+            XS_int%Fis=0.e0_prec
+            XS_int%Chi=0.e0_prec
+            XS_int%Scatt=0.e0_prec
+            XS_int%kFis=0.e0_prec
+            XS_int%Rem=0.e0_prec
+            XS_int%Dif=0.e0_prec
+            Phi_int=0.e0_prec
 
             ! Element-wise integral 
             do l=1, Opt_lo%n_tot
@@ -1181,12 +1182,12 @@ module Service_Fcns
 
             ! Chi 
             do l=1, Opt_gl%n_tot
-                temp=0.d0
+                temp=0.e0_prec
                 do g=1, Opt_gl%n_g
                     g_tot=(g-1)*Opt_gl%n_tot
                     temp=temp+XS_gl%nuFis(g_tot+l)*Phi_gl(g_tot+l)*GL_Mesh(l)%V_gl
                 end do
-                if (abs(temp)>1.d-15) then
+                if (abs(temp)>1.e-15_prec) then
                     do g=1, Opt_gl%n_g
                         g_tot=(g-1)*Opt_gl%n_tot
                         XS_gl%Chi(g_tot+l)=XS_int%Chi(g_tot+l)/temp
@@ -1194,13 +1195,13 @@ module Service_Fcns
                 else
                     do g=1, Opt_gl%n_g
                         g_tot=(g-1)*Opt_gl%n_tot
-                        XS_gl%Chi(g_tot+l)=0.d0
+                        XS_gl%Chi(g_tot+l)=0.e0_prec
                     end do
                 end if
             end do
 
             ! Diffusion coefficient 
-            XS_gl%Dif=1.d0/3.d0/XS_gl%Tra
+            XS_gl%Dif=1.e0_prec/3.e0_prec/XS_gl%Tra
 
             ! Removal coefficient 
             do g=1, Opt_gl%n_g
@@ -1218,8 +1219,8 @@ module Service_Fcns
             type(Options_Data), intent(in) :: Opt_lo, Opt_gl
             type(LO_geom), intent(in) :: LO_Mesh(:)
             type(LO_coeff), intent(in) :: LO_Param(:)
-            real(dp), intent(in) :: Phi_gl(:), Phi_avg_lo(:)
-            real(dp), intent(inout) :: Phi_lo(:)
+            real(prec), intent(in) :: Phi_gl(:), Phi_avg_lo(:)
+            real(prec), intent(inout) :: Phi_lo(:)
 
             integer :: l, ll, t, g, u, t_tot, t_red, g_tot
 
@@ -1250,12 +1251,12 @@ module Service_Fcns
             type(GL_coeff), intent(inout) :: GL_Param(:)
 
             integer :: i, g, l, u, n, t, t_tot, g_tot, infc, face_ID, face_ID_GL ! In Line Face Calc.      
-            real(dp) :: Phi_S
+            real(prec) :: Phi_S
 
             ! Initialization 
             do i=1, Opt_gl%n_tot*Opt_gl%n_g
-                GL_Param(i)%J_net(:)=0.d0
-                GL_Param(i)%J_part(:,:)=0.d0
+                GL_Param(i)%J_net(:)=0.e0_prec
+                GL_Param(i)%J_part(:,:)=0.e0_prec
             end do
 
 
@@ -1334,8 +1335,8 @@ module Service_Fcns
         end subroutine Currents_lo_to_gl_DerType
     
         subroutine SOR_Accel(w_SOR, Var_Pre, Final_Val) 
-            real(dp), intent(in) :: w_SOR, Var_Pre(:)
-            real(dp), intent(inout) :: Final_Val(:)
+            real(prec), intent(in) :: w_SOR, Var_Pre(:)
+            real(prec), intent(inout) :: Final_Val(:)
 
             Final_Val=(1-w_SOR)*Var_Pre+w_SOR*Final_Val
         end subroutine SOR_Accel

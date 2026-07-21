@@ -1,8 +1,7 @@
 module Eigen_spectrum_solver
 		use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+		use precision_kinds, only: prec
 		implicit none
-		
-	integer, parameter :: doupr=kind(1.d0)
 	
     contains
 		
@@ -10,10 +9,10 @@ module Eigen_spectrum_solver
 		subroutine Eigen_Routine(max_mesh_NewCMFD, n_g, NewCMFD_MigrMat, Chi_Homo, XS_nF_Homo, XS_SC_Homo, Phi, eigens_R, eigens_I) ! Adapter for the full eigenvalue problem 
 			integer :: t, j, l, g
             integer, intent(in) :: max_mesh_NewCMFD, n_g
-			real(doupr), intent(in) :: NewCMFD_MigrMat(:,:,:), Chi_Homo(:,:), XS_nF_Homo(:,:), XS_SC_Homo(:,:,:), Phi(:,:)
-			real(doupr), allocatable, intent(out) :: eigens_R(:), eigens_I(:)
+			real(prec), intent(in) :: NewCMFD_MigrMat(:,:,:), Chi_Homo(:,:), XS_nF_Homo(:,:), XS_SC_Homo(:,:,:), Phi(:,:)
+			real(prec), allocatable, intent(out) :: eigens_R(:), eigens_I(:)
             
-			real(doupr), allocatable :: Migrat_M(:,:), Out_Sc_M(:,:), Fiss_M(:,:), v1(:), Full_Phi(:,:), residuals(:)
+			real(prec), allocatable :: Migrat_M(:,:), Out_Sc_M(:,:), Fiss_M(:,:), v1(:), Full_Phi(:,:), residuals(:)
             
             allocate( Migrat_M(max_mesh_NewCMFD*n_g, max_mesh_NewCMFD*n_g))
             allocate( Out_Sc_M(max_mesh_NewCMFD*n_g, max_mesh_NewCMFD*n_g))
@@ -24,9 +23,9 @@ module Eigen_spectrum_solver
             
             allocate(eigens_R(max_mesh_NewCMFD*n_g), eigens_I(max_mesh_NewCMFD*n_g))
             
-            Migrat_M=0.d0
-			Out_Sc_M=0.d0
-            Fiss_M=0.d0
+            Migrat_M=0.e0_prec
+			Out_Sc_M=0.e0_prec
+            Fiss_M=0.e0_prec
             
             
             do t=1,n_g
@@ -96,12 +95,12 @@ module Eigen_spectrum_solver
 	
 		subroutine Arnoldi_alg(m, Phi, F, A, eigens_R, eigens_I, eigvect, res_tot) ! Arnoldi algorithm for non-symmetric large matrices. Return ALL the eigenvalues (not sorted) 
 			integer, intent(in) :: m
-			real(doupr), intent(in) :: Phi(:), F(:,:), A(:,:) ! A= Migration - (out-)Scattering
-			real(doupr), allocatable, intent(out) :: eigens_R(:), eigens_I(:), eigvect(:,:), res_tot(:)
-			real(doupr), allocatable :: H_m(:,:), H_upp_tr(:,:), V(:,:), H(:,:), z(:), w(:), Y_eigvect(:,:)
+			real(prec), intent(in) :: Phi(:), F(:,:), A(:,:) ! A= Migration - (out-)Scattering
+			real(prec), allocatable, intent(out) :: eigens_R(:), eigens_I(:), eigvect(:,:), res_tot(:)
+			real(prec), allocatable :: H_m(:,:), H_upp_tr(:,:), V(:,:), H(:,:), z(:), w(:), Y_eigvect(:,:)
 			
 			integer :: i, j, n, info=0
-			real(doupr) :: epsi=1.d-12
+			real(prec) :: epsi=1.e-12_prec
 			
 			n=size(Phi)
 			
@@ -109,9 +108,9 @@ module Eigen_spectrum_solver
 			allocate(H(m+1,m))
 			allocate(w(m))
 			
-			V=0.d0
-			H=0.d0
-			w=0.d0
+			V=0.e0_prec
+			H=0.e0_prec
+			w=0.e0_prec
 			
 			V(:,1)=Phi/norm_l2(Phi)
 			
@@ -120,7 +119,7 @@ module Eigen_spectrum_solver
 				z = matmul(F, V(:, j))     ! Matrix-free approach. 
                                            ! No explicit inversion of A = M - S
 				
-				call BiCGSTAB_Mat(n, A, z, w, 1.d-10, 1000000, info)
+				call BiCGSTAB_Mat(n, A, z, w, 1.e-10_prec, 1000000, info)
 				if (info/=0) exit Arnoldi_loop
 				
 				GramShmidt_ortogon: do i=1, j
@@ -130,7 +129,7 @@ module Eigen_spectrum_solver
 				
 				H(j+1,j)=norm_l2(w) ! l_2 module of w
 				
-				if (H(j+1,j)<1.d-12) exit Arnoldi_loop
+				if (H(j+1,j)<1.e-12_prec) exit Arnoldi_loop
 				
 				V(:,j+1)=w/H(j+1,j)
 				
@@ -147,9 +146,9 @@ module Eigen_spectrum_solver
                 allocate(eigvect(n,j))
                 allocate(res_tot(j))
 				H_m=H(:j,:j)
-                eigens_R=0.d0
-                eigens_I=0.d0
-                Y_eigvect=0.d0
+                eigens_R=0.e0_prec
+                eigens_I=0.e0_prec
+                Y_eigvect=0.e0_prec
 				call QR_main_Complex(j, H_m, epsi, eigens_R, eigens_I, Y_eigvect)
                 
                 do i=1, j
@@ -166,19 +165,19 @@ module Eigen_spectrum_solver
 		end subroutine Arnoldi_alg
 		
 		function norm_l2(x) result(norm_x) 
-			real(doupr), intent(in) :: x(:)
-			real(doupr) :: norm_x
+			real(prec), intent(in) :: x(:)
+			real(prec) :: norm_x
 			
 			norm_x=sqrt(dot_product(x,x))
 		end function norm_l2
 				
 		subroutine BiCGSTAB_Mat(n, A, b, x, tol, max_iter, info) 
 			integer, intent(in) :: n, max_iter
-			real(doupr), intent(in) :: A(:,:), b(:), tol
-			real(doupr), intent(inout) :: x(:)
+			real(prec), intent(in) :: A(:,:), b(:), tol
+			real(prec), intent(inout) :: x(:)
 			integer, intent(out) :: info
-			real(doupr), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
-			real(doupr) :: alpha, beta, omega, rho, rho_old, error
+			real(prec), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
+			real(prec) :: alpha, beta, omega, rho, rho_old, error
 			integer :: k
 			
             allocate(r(n), r_old(n), v(n), p(n), s(n), t(n), x_old(n))
@@ -187,11 +186,11 @@ module Eigen_spectrum_solver
 			
 			r=b-r		! b array in Ax=b (known)
 			r_old=r
-			rho_old=1.d0
-			alpha=1.d0	 ! to make beta = 0 and thus p = r for the first iteration
-			omega=1.d0
-			v=0.d0
-			p=0.d0
+			rho_old=1.e0_prec
+			alpha=1.e0_prec	 ! to make beta = 0 and thus p = r for the first iteration
+			omega=1.e0_prec
+			v=0.e0_prec
+			p=0.e0_prec
 			
 			Iter_Loop: do k=1, max_iter 
 				x_old=x
@@ -236,27 +235,27 @@ module Eigen_spectrum_solver
 
         subroutine QR_main_Complex(m, H_real, epsi, eigens_R, eigens_I, Y_eigvect) ! QR Algorithm w/ shift and complex numbers handling 
 			integer, intent(in) :: m
-			real(doupr), intent(in) :: H_real(m,m), epsi
-			real(doupr), intent(out) :: eigens_R(m), eigens_I(m), Y_eigvect(m,m)
+			real(prec), intent(in) :: H_real(m,m), epsi
+			real(prec), intent(out) :: eigens_R(m), eigens_I(m), Y_eigvect(m,m)
 			
 			integer :: i, k, iter_max
-			real(doupr) :: temp, mi
+			real(prec) :: temp, mi
 			
-            complex(doupr) :: H_upp_tr(m,m), Q_acc(m,m)
-            complex(doupr), allocatable :: eigens(:), H(:,:), H_temp(:,:), Q_temp(:,:), R_temp(:,:), eye(:,:)
+            complex(prec) :: H_upp_tr(m,m), Q_acc(m,m)
+            complex(prec), allocatable :: eigens(:), H(:,:), H_temp(:,:), Q_temp(:,:), R_temp(:,:), eye(:,:)
             
 			iter_max=1e6
-			eigens=0.d0
+			eigens=0.e0_prec
             
             allocate(eigens(m), H(m,m), H_temp(m,m), Q_temp(m,m), R_temp(m,m), eye(m,m))
             
-            H=cmplx(H_real, 0.d0, kind=kind(doupr)) ! To verify my need kind=kind(doupr), cmplx(H_real, kind=doupr)
-			H_upp_tr=0.d0
+            H=cmplx(H_real, 0.e0_prec, kind=prec) ! To verify my need kind=prec, cmplx(H_real, kind=prec)
+			H_upp_tr=0.e0_prec
 			
 			! Identity matrix building
-			eye=0.d0
+			eye=0.e0_prec
 			do i=1,m
-				eye(i,i)=(1.d0, 0.d0)
+				eye(i,i)=(1.e0_prec, 0.e0_prec)
             end do	
 			Q_acc=eye
             
@@ -277,7 +276,7 @@ module Eigen_spectrum_solver
                 Q_acc=matmul(Q_acc, Q_temp)
                 
 				! Check the upper-triangular layout
-				temp=0.d0
+				temp=0.e0_prec
 				do i=2, size(H_temp, 1)
 					temp=temp+sum(abs(real(H_temp(i,1:i-1))))+sum(abs(aimag(H_temp(i,1:i-1)))) ! +sum(abs(H_temp(i,1:i-1))) for the precise computation of the modulus (more expensive)
 				end do
@@ -301,26 +300,26 @@ module Eigen_spectrum_solver
         
         subroutine QR_decomp_Complex(m, H_mat, Q_mat, R_mat) 
 			integer, intent(in) :: m
-			complex(doupr), intent(in) :: H_mat(:,:)
-			complex(doupr), intent(out) :: Q_mat(:,:), R_mat(:,:)
+			complex(prec), intent(in) :: H_mat(:,:)
+			complex(prec), intent(out) :: Q_mat(:,:), R_mat(:,:)
 			
 			integer :: i, j
-			complex(doupr) :: a, b, r, c, s, temp1,temp2
+			complex(prec) :: a, b, r, c, s, temp1,temp2
 			
-			complex(doupr) :: G_mat(2,2), R_temp_mat(m,m)
+			complex(prec) :: G_mat(2,2), R_temp_mat(m,m)
 			
 			
 			R_mat=H_mat
-			Q_mat=0.d0
+			Q_mat=0.e0_prec
 			do i=1,size(Q_mat,1)
-				Q_mat(i,i)=cmplx(1.d0,0.d0, kind=doupr) ! Identity matrix structure
+				Q_mat(i,i)=cmplx(1.e0_prec,0.e0_prec, kind=prec) ! Identity matrix structure
 			end do
 			
 			do i=1,m-1
 				a=R_mat(i,i)
 				b=R_mat(i+1,i)
 				r=sqrt(conjg(a)*a+conjg(b)*b)
-				if (abs(real(r))+abs(aimag(r))<1.d-14) cycle ! Skipping the cycle if r = 0.0 for robustness
+				if (abs(real(r))+abs(aimag(r))<1.e-14_prec) cycle ! Skipping the cycle if r = 0.0 for robustness
 				c=a/r
 				s=b/r
 				
@@ -358,11 +357,11 @@ module Eigen_spectrum_solver
         end subroutine QR_decomp_Complex
         
         subroutine QR_shift_Complex(a, b, c, mi) ! Works also for non-symmetric matrices 
-			complex(doupr), intent(in) :: a, b, c ! sub matrix elements from the Hessemberg. 
-			real(doupr), intent(out) :: mi
+			complex(prec), intent(in) :: a, b, c ! sub matrix elements from the Hessemberg.
+			real(prec), intent(out) :: mi
 			
             integer :: i(1)
-			real(doupr) :: roots(2), temp(2)
+			real(prec) :: roots(2), temp(2)
             
 			
 			! sub_M = |1   2| = |H_(m-1, m-1)   H_(m-1,   m)|
@@ -375,8 +374,8 @@ module Eigen_spectrum_solver
 			!b=sub_M(2,1)
 			!c=sub_M(2,2)
 			
-			roots(1)=(a+c)/2.d0+sqrt((a-c)**2/4.d0+b**2)
-			roots(2)=(a+c)/2.d0-sqrt((a-c)**2/4.d0+b**2)
+			roots(1)=(a+c)/2.e0_prec+sqrt((a-c)**2/4.e0_prec+b**2)
+			roots(2)=(a+c)/2.e0_prec-sqrt((a-c)**2/4.e0_prec+b**2)
 			
             i=minloc(abs(roots-c))
 			mi=roots(i(1))

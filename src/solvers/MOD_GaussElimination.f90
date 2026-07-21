@@ -1,7 +1,6 @@
 module GaussElimination 
+    use precision_kinds, only: prec
         implicit none
-    
-	integer, parameter :: dp_var = kind(1.d0)
         
     
     contains
@@ -9,10 +8,10 @@ module GaussElimination
             implicit none
         integer, intent(in) :: n
         integer :: i, j, k
-        real(dp_var), intent(in) :: A_in(:,:), b_in(:)
-        real(dp_var), intent(out) :: x(:)
-        real(dp_var) :: factor
-        real(dp_var), allocatable :: A(:,:), b(:)
+        real(prec), intent(in) :: A_in(:,:), b_in(:)
+        real(prec), intent(out) :: x(:)
+        real(prec) :: factor
+        real(prec), allocatable :: A(:,:), b(:)
     
         allocate(A(n,n))
         allocate(b(n)) 
@@ -40,9 +39,9 @@ module GaussElimination
     
     subroutine partial_pivot(A, b, n, k)
         integer, intent(in) :: n, k
-        real(8), intent(inout) :: A(n, n), b(n)
+        real(prec), intent(inout) :: A(n, n), b(n)
         integer :: max_row, i
-        real(8) :: temp
+        real(prec) :: temp
     
         ! Find the row with the largest element in column k
         max_row = k

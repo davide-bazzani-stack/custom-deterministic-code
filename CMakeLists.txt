@@ -5,11 +5,14 @@ project(Deterministic_FVM_Code LANGUAGES Fortran)
 include(CTest)
 
 set(FVM_CORE_SOURCES
+    src/variables/MOD_kinds.f90
+    src/variables/MOD_constants.f90
+    src/variables/Variables.f90
     src/MOD_IO_routines.f90
-    src/Variables.f90
     src/MOD_Recurrent_Functions.f90
-    src/MOD_BiCGSTAB_Solvers.f90
-    src/MOD_GaussElimination.f90
+    src/solvers/MOD_BiCGSTAB_old_manual.f90
+    src/solvers/MOD_BiCGSTAB_Solver.f90
+    src/solvers/MOD_GaussElimination.f90
     src/MOD_EigenvaluesSpectrumSolver.f90
     src/MOD_CMFD_Package.f90
     src/MOD_pCMFD_Package.f90
@@ -33,7 +36,7 @@ target_include_directories(fvm_core PUBLIC
     "$<BUILD_INTERFACE:${FVM_CORE_MODULE_DIRECTORY}>"
 )
 
-add_executable(Deterministic_FVM_Code src/Header.f90)
+add_executable(Deterministic_FVM_Code src/main/Header.f90)
 target_link_libraries(Deterministic_FVM_Code PRIVATE fvm_core)
 set_target_properties(Deterministic_FVM_Code PROPERTIES
     Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/modules/application"
@@ -54,8 +57,9 @@ endfunction()
 fvm_set_fortran_options(fvm_core)
 fvm_set_fortran_options(Deterministic_FVM_Code)
 
-# The legacy readers use fixed filenames relative to the process working
-# directory. Stage the current inputs in the build tree without changing them.
+# The legacy readers use input/... paths relative to the process working
+# directory. Stage the current inputs in the same layout in the build tree.
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/input")
 foreach(input_name
         Options_Input.inp
         Material_Input.inp
@@ -64,12 +68,12 @@ foreach(input_name
         HGCMFD_Grid.inp)
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/input/${input_name}"
-        "${CMAKE_CURRENT_BINARY_DIR}/${input_name}"
+        "${CMAKE_CURRENT_BINARY_DIR}/input/${input_name}"
         COPYONLY
     )
 endforeach()
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/output")
 
-if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()

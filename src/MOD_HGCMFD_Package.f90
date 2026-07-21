@@ -7,6 +7,7 @@
 !   
 !==========================================================================================================================  
 module HGCMFD_Alg
+    use precision_kinds, only: prec
     use Variables
     use GaussElimination
     use Service_Fcns
@@ -28,15 +29,15 @@ module HGCMFD_Alg
         type(Accel_Vars_Vect), intent(inout) :: Serv_Vect
         type(Accel_Vars_Matr), intent(inout) :: Serv_Matr
         
-        real(dp), allocatable, intent(inout) :: Phi_lo(:)
+        real(prec), allocatable, intent(inout) :: Phi_lo(:)
         
         
         integer :: i, j, l, u, t, g, t_tot, g_tot, iter_out_gl, iter_in_gl, info
-        real(dp) :: err0, err1, err2, k_old_gl, k_gl, Phi_avg_lo(Opt_gl%n_g*Opt_gl%n_tot)
-        real(dp), allocatable :: eigens_R(:), eigens_I(:), Phi_lo_temp(:)
+        real(prec) :: err0, err1, err2, k_old_gl, k_gl, Phi_avg_lo(Opt_gl%n_g*Opt_gl%n_tot)
+        real(prec), allocatable :: eigens_R(:), eigens_I(:), Phi_lo_temp(:)
         
         integer :: ll, t_red
-        real(dp) :: tempRR(Opt_gl%n_g*Opt_gl%n_tot)
+        real(prec) :: tempRR(Opt_gl%n_g*Opt_gl%n_tot)
         
         
         ! Current calculation
@@ -79,10 +80,10 @@ module HGCMFD_Alg
         
         
         ! Initialization 
-        err0=1.d0
-        err1=1.d0
-        err2=1.d0
-        k_gl=1.d0
+        err0=1.e0_prec
+        err1=1.e0_prec
+        err2=1.e0_prec
+        k_gl=1.e0_prec
         iter_out_gl=0
         
         ! Outer global iterations 
@@ -92,7 +93,7 @@ module HGCMFD_Alg
             Serv_Vect%Phi_old=Serv_Vect%Phi
             
             ! Fission Source building 
-            Serv_Vect%S_fiss_old=0.d0
+            Serv_Vect%S_fiss_old=0.e0_prec
             do t=1, Opt_gl%n_g
                 t_tot=(t-1)*Opt_gl%n_tot
                 Serv_Vect%S_fiss_old(1:Opt_gl%n_tot)=Serv_Vect%S_fiss_old(1:Opt_gl%n_tot)+Serv_Vect%Phi_old(t_tot+1:t_tot+Opt_gl%n_tot)*XS_gl%nuFis(t_tot+1:t_tot+Opt_gl%n_tot)
@@ -100,7 +101,7 @@ module HGCMFD_Alg
             
             ! Inner iterations 
             iter_in_gl=0
-            err0=1.d0
+            err0=1.e0_prec
             do while (err0>Opt_gl%tol0 .AND. iter_in_gl<Opt_gl%it_in_max)
                 iter_in_gl=iter_in_gl+1
                 Serv_Vect%Phi_temp=Serv_Vect%Phi
@@ -136,7 +137,7 @@ module HGCMFD_Alg
             end do
             
             ! Fission Source building 
-            Serv_Vect%S_fiss=0.d0
+            Serv_Vect%S_fiss=0.e0_prec
             do t=1, Opt_gl%n_g
                 t_tot=(t-1)*Opt_gl%n_tot
                 Serv_Vect%S_fiss(1:Opt_gl%n_tot)=Serv_Vect%S_fiss(1:Opt_gl%n_tot)+Serv_Vect%Phi(t_tot+1:t_tot+Opt_gl%n_tot)*XS_gl%nuFis(t_tot+1:t_tot+Opt_gl%n_tot)
@@ -188,7 +189,7 @@ module HGCMFD_Alg
     
     
     subroutine D_tilde_Build(Opt_gl, Elem_det, GL_Mesh, D_gl, GL_Param) 
-        real(dp), intent(in) :: D_gl(:)
+        real(prec), intent(in) :: D_gl(:)
         
         type(Options_Data), intent(in) :: Opt_gl
         type(Figure), intent(in) :: Elem_det(:)
@@ -198,8 +199,8 @@ module HGCMFD_Alg
         integer :: l, t, n, t_tot
         
         do l=1, size(GL_Param)
-            GL_Param(l)%D_Til=0.d0
-            GL_Param(l)%D_Til_El=0.d0
+            GL_Param(l)%D_Til=0.e0_prec
+            GL_Param(l)%D_Til_El=0.e0_prec
         end do
         
         
@@ -231,7 +232,7 @@ module HGCMFD_Alg
         
         integer :: l, t, n, u, t_tot
         integer :: no_faces
-        real(dp) :: area_sum        
+        real(prec) :: area_sum
         
         ! Non-BG Meshes
         do l=2, n_tot_gl ! Skipping the BG mesh, iteration "on the universe"    ! maxval(lo_to_gl_V)
@@ -250,13 +251,13 @@ module HGCMFD_Alg
     
     subroutine D_Hat_Build(n_g, n_tot, Phi_Ref, GL_Mesh, GL_Param) 
         integer, intent(in) :: n_g, n_tot
-        real(dp), intent(in) :: Phi_Ref(:)
+        real(prec), intent(in) :: Phi_Ref(:)
         
         type(GL_geom), intent(in) :: GL_Mesh(:)
         type(GL_coeff), intent(inout) :: GL_Param(:)
                 
         integer :: t, l, t_tot, no_faces
-        real(dp) :: area_sum
+        real(prec) :: area_sum
         
         no_faces=size(GL_Mesh(1)%A_gl(:))
         area_sum=sum(GL_Mesh(1)%A_gl(:))
@@ -276,21 +277,21 @@ module HGCMFD_Alg
     
     subroutine MigrMat_Impl(n_g, n_tot, XS_RM, HGCMFD_Mesh, HGCMFD_Param, a_MM, b_MM, c_MM) 
         integer, intent(in) :: n_g, n_tot
-        real(dp), intent(in) :: XS_RM(:)
+        real(prec), intent(in) :: XS_RM(:)
         
         type(GL_geom), intent(in) :: HGCMFD_Mesh(:)
         type(GL_coeff), intent(in) :: HGCMFD_Param(:)
         !type(Accel_Vars_Vect), intent(inout) :: Serv_Vect(:)
         
-        real(dp), intent(out) :: a_MM(:), b_MM(:), c_MM(:)
+        real(prec), intent(out) :: a_MM(:), b_MM(:), c_MM(:)
         
         integer :: t, l, t_tot
-        real(dp) :: area_sum
+        real(prec) :: area_sum
         
         
-        a_MM=0.d0
-        b_MM=0.d0
-        c_MM=0.d0
+        a_MM=0.e0_prec
+        b_MM=0.e0_prec
+        c_MM=0.e0_prec
         
         do t=1, n_g
             t_tot=(t-1)*n_tot
@@ -315,19 +316,19 @@ module HGCMFD_Alg
     
     subroutine MigrMat_Expl(n_g, n_tot, XS_RM, HGCMFD_Mesh, HGCMFD_Param, MM) 
         integer, intent(in) :: n_g, n_tot
-        real(dp), intent(in) :: XS_RM(:)
+        real(prec), intent(in) :: XS_RM(:)
         
         type(GL_geom), intent(in) :: HGCMFD_Mesh(:)
         type(GL_coeff), intent(in) :: HGCMFD_Param(:)
         !type(Accel_Vars_Vect), intent(inout) :: Serv_Vect(:)
         
-        real(dp), intent(out) :: MM(:,:)
+        real(prec), intent(out) :: MM(:,:)
         
         integer :: t, l, t_tot
-        real(dp) :: area_sum
+        real(prec) :: area_sum
         
         
-        MM=0.d0
+        MM=0.e0_prec
         
         do t=1, n_g
             t_tot=(t-1)*n_tot
@@ -351,18 +352,18 @@ module HGCMFD_Alg
     end subroutine MigrMat_Expl
     
     subroutine Optim_dl(Opt_gl, D_gl, GL_Mesh, GL_Param, Phi_ref) 
-        real(dp), intent(in) :: D_gl(:), Phi_ref(:)
+        real(prec), intent(in) :: D_gl(:), Phi_ref(:)
     
         type(Options_Data), intent(in) :: Opt_gl
         type(GL_geom), intent(inout) :: GL_Mesh(:)
         type(GL_coeff), intent(inout) :: GL_Param(:)
         
         integer :: l, t, n, u, t_tot
-        real(dp) :: temp
-        real(dp), allocatable :: dl_cand(:)
+        real(prec) :: temp
+        real(prec), allocatable :: dl_cand(:)
         
         allocate(dl_cand(Opt_gl%n_tot*Opt_gl%n_g))
-        dl_cand(:)=1d-3
+        dl_cand(:)=1e-3_prec
         
         
         
@@ -372,7 +373,7 @@ module HGCMFD_Alg
                 ! Factor computation D_tilde_avg
                 t_tot=(t-1)*Opt_gl%n_tot
                 
-                temp=(3d-2*(Phi_Ref(t_tot+1)+Phi_ref(t_tot+l))-GL_Param(t_tot+l)%J_Net_el)/(Phi_Ref(t_tot+1)-Phi_ref(t_tot+l))
+                temp=(3e-2_prec*(Phi_Ref(t_tot+1)+Phi_ref(t_tot+l))-GL_Param(t_tot+l)%J_Net_el)/(Phi_Ref(t_tot+1)-Phi_ref(t_tot+l))
                 
                 dl_cand(t_tot+l)=D_gl(t_tot+1)*(1/temp-D_gl(t_tot+1)-GL_Mesh(l)%dl_gl(1)/D_gl(t_tot+l))
                 
@@ -394,13 +395,13 @@ module HGCMFD_Alg
     
     
     subroutine D_tilde_Mod(Opt_gl, GL_Param, Phi_ref) 
-        real(dp), intent(in) :: Phi_ref(:)
+        real(prec), intent(in) :: Phi_ref(:)
     
         type(Options_Data), intent(in) :: Opt_gl
         type(GL_coeff), intent(inout) :: GL_Param(:)
         
         integer :: l, t, n, u, t_tot
-        real(dp) :: epsi
+        real(prec) :: epsi
         
         
         do l=2, Opt_gl%n_tot
@@ -408,7 +409,7 @@ module HGCMFD_Alg
                 ! Factor computation D_tilde_avg
                 t_tot=(t-1)*Opt_gl%n_tot
                 
-                epsi=(1d-3*(Phi_Ref(t_tot+1)+Phi_ref(t_tot+l))-GL_Param(t_tot+l)%J_Net_el)/(GL_Param(t_tot+l)%D_til_el(1)*(Phi_Ref(t_tot+1)-Phi_ref(t_tot+l)))
+                epsi=(1e-3_prec*(Phi_Ref(t_tot+1)+Phi_ref(t_tot+l))-GL_Param(t_tot+l)%J_Net_el)/(GL_Param(t_tot+l)%D_til_el(1)*(Phi_Ref(t_tot+1)-Phi_ref(t_tot+l)))
                 
                 GL_Param(t_tot+l)%D_til_el(1)=GL_Param(t_tot+l)%D_til_el(1)*epsi
                 
@@ -422,9 +423,9 @@ module HGCMFD_Alg
     subroutine Schur_Complement_Vect(n, a_in, b_in, c_in, y_in, x) 
         integer, intent(in) :: n
         integer :: i
-        real(dp), intent(in) :: a_in(:), b_in(:), c_in(:), y_in(:)        ! Ax = y
-        real(dp), intent(out) :: x(:)
-        real(dp) :: factor, S_compl
+        real(prec), intent(in) :: a_in(:), b_in(:), c_in(:), y_in(:)        ! Ax = y
+        real(prec), intent(out) :: x(:)
+        real(prec) :: factor, S_compl
         
         S_compl=b_in(1)
         x(1)=y_in(1)
@@ -442,11 +443,11 @@ module HGCMFD_Alg
     
     subroutine BiCGSTAB_HGCMFD(n, max_iter, tol, a, b, c, rhs, x, info) 
         integer, intent(in) :: n, max_iter
-        real(dp), intent(in) :: a(:), b(:), c(:), rhs(:), tol
-        real(dp), intent(inout) :: x(:)
+        real(prec), intent(in) :: a(:), b(:), c(:), rhs(:), tol
+        real(prec), intent(inout) :: x(:)
         integer, intent(out) :: info
-        real(dp), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
-        real(dp) :: alpha, beta, omega, rho, rho_old, error, norm_b
+        real(prec), allocatable :: r(:), r_old(:), v(:), p(:), s(:), t(:), x_old(:)
+        real(prec) :: alpha, beta, omega, rho, rho_old, error, norm_b
         integer :: k
                 
         allocate(r(n))
@@ -463,13 +464,13 @@ module HGCMFD_Alg
         
         r=rhs-r		! b array in Ax=b (known)
         r_old=r
-        rho_old=1.d0
-        alpha=1.d0	 ! to make beta = 0 and thus p = r for the first iteration
-        omega=1.d0
-        v=0.d0
-        p=0.d0
+        rho_old=1.e0_prec
+        alpha=1.e0_prec	 ! to make beta = 0 and thus p = r for the first iteration
+        omega=1.e0_prec
+        v=0.e0_prec
+        p=0.e0_prec
         
-        norm_b=max(sqrt(dot_product(rhs, rhs)), 1.d0)
+        norm_b=max(sqrt(dot_product(rhs, rhs)), 1.e0_prec)
         
         do k=1,max_iter
             x_old=x
@@ -512,8 +513,8 @@ module HGCMFD_Alg
     
     subroutine matvect_arrow(n, a, b, c, x, y) 
         integer, intent(in) :: n
-        real(dp), intent(in) :: a(:), b(:), c(:), x(:)
-        real(dp), intent(out):: y(:)
+        real(prec), intent(in) :: a(:), b(:), c(:), x(:)
+        real(prec), intent(out):: y(:)
         integer :: i
         
         y(1) = b(1)*x(1)

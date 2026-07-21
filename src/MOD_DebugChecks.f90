@@ -1,5 +1,6 @@
 module Intermediates
     use iso_fortran_env, only: output_unit, error_unit
+    use precision_kinds, only: prec
     use IO_module, only: files, output_dir, debug_mark, file_type
     use Variables
     
@@ -9,22 +10,22 @@ module Intermediates
     
         subroutine Reaction_Rate_Single(Phi, XS_k, V, RR) 
             
-            real(dp), intent(in) :: Phi(:), XS_k(:), V(:)
-            real(dp), intent(out) :: RR(:)
+            real(prec), intent(in) :: Phi(:), XS_k(:), V(:)
+            real(prec), intent(out) :: RR(:)
                         
             RR = Phi*XS_k*V
             
         end subroutine Reaction_Rate_Single
         
         subroutine Reaction_Rates_Print(Phi, Vol, Opt, XS_gl, filename) ! filename='ReactionRates_Ref' or 'ReactionRates_Acc' 
-            real(dp), intent(in) :: Phi(:), Vol(:)
+            real(prec), intent(in) :: Phi(:), Vol(:)
             type(Options_Data), intent(in) :: Opt
             type(XS_Data), intent(in) :: XS_gl
             
             character(len=17), intent(in) :: filename
             
             integer :: i, iu, t, t_tot
-            real(dp), allocatable :: XS(:,:), RR(:,:)
+            real(prec), allocatable :: XS(:,:), RR(:,:)
             
             ! Size check 
             if (size(XS_gl%Tot) /= size(Phi)) then

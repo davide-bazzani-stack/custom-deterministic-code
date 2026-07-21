@@ -1,10 +1,11 @@
 module Input_Reader
     use iso_fortran_env, only: output_unit, error_unit
+    use precision_kinds, only: prec
+    use constants, only: pi
     use Variables
     use IO_module, only : files
     use Service_Fcns
-    !integer, parameter :: dp=kind(1.d0)
-    
+
         implicit none
         
     contains
@@ -18,7 +19,7 @@ module Input_Reader
             type(Flo_input_check) :: tol_solv, tol0, tol1, tol2, w_SOR, dxdl
             type(Char_input_check) :: mesh_strc
             
-            real(dp), intent(out) :: dl_input, dx_input
+            real(prec), intent(out) :: dl_input, dx_input
         
             ! Service variables
             integer :: l, ios=0, iter
@@ -27,7 +28,7 @@ module Input_Reader
             
             
             ! Options file reading
-            open(unit=120, file='Options_Input.inp', status='old', action='read')
+            open(unit=120, file='input/Options_Input.inp', status='old', action='read')
         
         
                 
@@ -48,6 +49,7 @@ module Input_Reader
                 if (index(file_line, '% Local') > 0) then 
                     
                     ! Sentinel values 
+                    Opt_lo%preconditioner='Identity' ! Temporary hardcoded selection
                     mesh_strc%variable=''
                     flag_ms%value=-1
                     n_x%value=0
@@ -56,11 +58,11 @@ module Input_Reader
                     it_sol_max%value=0
                     it_out_max%value=0
                     it_in_max%value=0
-                    w_SOR%value=0.d0
-                    tol_solv%value=0.d0
-                    tol0%value=0.d0
-                    tol1%value=0.d0
-                    tol2%value=0.d0
+                    w_SOR%value=0.e0_prec
+                    tol_solv%value=0.e0_prec
+                    tol0%value=0.e0_prec
+                    tol1%value=0.e0_prec
+                    tol2%value=0.e0_prec
                     mesh_strc%is_set=.FALSE.
                     flag_ms%is_set=.FALSE.
                     n_x%is_set=.FALSE.
@@ -159,9 +161,9 @@ module Input_Reader
                             
                             elseif (trim(SOR)=='N') then
                                 Opt_lo%flag_SOR=0
-                                Opt_lo%w_SOR=1.d0
+                                Opt_lo%w_SOR=1.e0_prec
                                 read(120,'(A)') file_line !# skip the line
-                                w_SOR%value=1.d0
+                                w_SOR%value=1.e0_prec
                                 w_SOR%is_set=.TRUE.
                             end if
                             
@@ -195,11 +197,11 @@ module Input_Reader
                     it_sol_max%value=0
                     it_out_max%value=0
                     it_in_max%value=0
-                    w_SOR%value=0.d0
-                    tol_solv%value=0.d0
-                    tol0%value=0.d0
-                    tol1%value=0.d0
-                    tol2%value=0.d0
+                    w_SOR%value=0.e0_prec
+                    tol_solv%value=0.e0_prec
+                    tol0%value=0.e0_prec
+                    tol1%value=0.e0_prec
+                    tol2%value=0.e0_prec
                     mesh_strc%is_set=.FALSE.
                     flag_ms%is_set=.FALSE.
                     n_x%is_set=.FALSE.
@@ -288,9 +290,9 @@ module Input_Reader
                             
                             elseif (trim(SOR)=='N') then
                                 Opt_gl%flag_SOR=0
-                                Opt_gl%w_SOR=1.d0
+                                Opt_gl%w_SOR=1.e0_prec
                                 read(120,'(A)') file_line !# skip the line
-                                w_SOR%value=1.d0
+                                w_SOR%value=1.e0_prec
                                 w_SOR%is_set=.TRUE.
                             end if
                                                                         
@@ -391,7 +393,7 @@ module Input_Reader
             !   XS_SC =
             !       1.2 1.4 # From g=1
             !       1.2 1.4 # From g=2 ...
-            open(unit=100, file='Material_Input.inp', status='old', action='read')
+            open(unit=100, file='input/Material_Input.inp', status='old', action='read')
             
             
             write(output_unit,*) 
@@ -431,16 +433,16 @@ module Input_Reader
                 allocate(Input_Materials(m)%XS_RM(n_groups))
                 allocate(Input_Materials(m)%XS_D(n_groups))
                 
-                Input_Materials(m)%XS_TO=0.d0
-                Input_Materials(m)%XS_TR=0.d0
-                Input_Materials(m)%XS_AB=0.d0
-                Input_Materials(m)%XS_nF=0.d0
-                Input_Materials(m)%XS_FS=0.d0
-                Input_Materials(m)%XS_SC=0.d0
-                Input_Materials(m)%Chi  =0.d0
-                Input_Materials(m)%XS_kF=0.d0
-                Input_Materials(m)%XS_RM=0.d0
-                Input_Materials(m)%XS_D =0.d0
+                Input_Materials(m)%XS_TO=0.e0_prec
+                Input_Materials(m)%XS_TR=0.e0_prec
+                Input_Materials(m)%XS_AB=0.e0_prec
+                Input_Materials(m)%XS_nF=0.e0_prec
+                Input_Materials(m)%XS_FS=0.e0_prec
+                Input_Materials(m)%XS_SC=0.e0_prec
+                Input_Materials(m)%Chi  =0.e0_prec
+                Input_Materials(m)%XS_kF=0.e0_prec
+                Input_Materials(m)%XS_RM=0.e0_prec
+                Input_Materials(m)%XS_D =0.e0_prec
             end do
             
             ! Data extraction 
@@ -501,8 +503,8 @@ module Input_Reader
             
             ! Verification of the removal cross section presence 
             do l=1, n_materials
-                if (sum(Input_Materials(l)%XS_RM(:))<1.d-12) then
-                    Input_Materials(l)%XS_RM=0.d0
+                if (sum(Input_Materials(l)%XS_RM(:))<1.e-12_prec) then
+                    Input_Materials(l)%XS_RM=0.e0_prec
                     do g=1, n_groups
                         Input_Materials(l)%XS_RM(g)=Input_Materials(l)%XS_AB(g)+sum(Input_Materials(l)%XS_SC(g, :))-Input_Materials(l)%XS_SC(g, g)
                     end do
@@ -511,15 +513,15 @@ module Input_Reader
             
             ! Approximation of the Transport XS to the Total one in case of no input 
             do l=1, n_materials 
-                if (sum(Input_Materials(l)%XS_TR(:))<1.d-12) then
+                if (sum(Input_Materials(l)%XS_TR(:))<1.e-12_prec) then
                     Input_Materials(l)%XS_TR(:)=Input_Materials(l)%XS_TO(:)
                 end if
             end do
             
             ! Verification of the diffusion coefficient 
             do l=1, n_materials
-                if (sum(Input_Materials(l)%XS_D(:))<1.d-12) then
-                    Input_Materials(l)%XS_D(:)=1.d0/(3.d0*Input_Materials(l)%XS_TR(:))
+                if (sum(Input_Materials(l)%XS_D(:))<1.e-12_prec) then
+                    Input_Materials(l)%XS_D(:)=1.e0_prec/(3.e0_prec*Input_Materials(l)%XS_TR(:))
                 end if
             end do
             
@@ -541,12 +543,12 @@ module Input_Reader
             type(LO_coeff), allocatable, intent(out) :: LO_Coef(:)
             
             !integer, allocatable, intent(out) :: IDs_lo_Red(:)
-            real(dp), intent(out) :: dx_gh, dy_gh 
+            real(prec), intent(out) :: dx_gh, dy_gh
             
             integer :: i, j, l, n, u, t, t_tot, g, m, ll, n_tot, ios, n_elements, box_mat_ID, no_faces, iln
-            real(dp) :: face_center(2)
-            real(dp) :: xmin, xmax, base_width, side, height, apothem
-            real(dp), allocatable :: gam_lo(:)
+            real(prec) :: face_center(2)
+            real(prec) :: xmin, xmax, base_width, side, height, apothem
+            real(prec), allocatable :: gam_lo(:)
             character(len=256) :: file_line, Elem_type
             
             logical :: test
@@ -567,7 +569,7 @@ module Input_Reader
                 case(2)
                     allocate(gam_lo(6))
             end select 
-            gam_lo=-1.d0    
+            gam_lo=-1.e0_prec
                         
             
             write(output_unit,*) 
@@ -578,7 +580,7 @@ module Input_Reader
             
             
             ! Elements data
-            open(unit=110, file='Geometry_Input.inp', status='old', action='read')
+            open(unit=110, file='input/Geometry_Input.inp', status='old', action='read')
             
             ! Automatic detection of the number of objects 
             n=0
@@ -670,7 +672,7 @@ module Input_Reader
                             write(output_unit,'(A)') 'ERROR IN THE GEOMETRY CARD READING - Wrong mesh in the BC reading'
                             write(error_unit,'(A)') 'ERROR IN THE GEOMETRY CARD READING - Wrong mesh in the BC reading'
                     end select
-                    if (any(gam_lo<0.d0)) then 
+                    if (any(gam_lo<0.e0_prec)) then
                         write(output_unit,'(A)') 'ERROR IN THE GEOMETRY CARD READING - Missing BC'
                         write(error_unit,'(A)') 'ERROR IN THE GEOMETRY CARD READING - Missing BC'
                         exit
@@ -828,10 +830,10 @@ module Input_Reader
             xmax=maxval(Elem_det(box_mat_ID)%vertices(1,:))
             xmin=minval(Elem_det(box_mat_ID)%vertices(1,:))
             side=xmax-xmin
-            apothem=side/(2.d0*tan(2.d0*pi/no_faces))
+            apothem=side/(2.e0_prec*tan(2.e0_prec*pi/no_faces))
             
             base_width=side
-            height=apothem*2.d0
+            height=apothem*2.e0_prec
                 
             write(output_unit,'(A)') '...Done'
             write(files%log,'(A)') '...Done'
@@ -874,16 +876,16 @@ module Input_Reader
                 
                 LO_Mesh(l)%Sides_ID=0
                 LO_Mesh(l)%Sides_Neigh=0
-                LO_Mesh(l)%Cent=0.d0
-                LO_Mesh(l)%Vert=0.d0
+                LO_Mesh(l)%Cent=0.e0_prec
+                LO_Mesh(l)%Vert=0.e0_prec
                 LO_Mesh(l)%Neigh_ID=-1
                 LO_Mesh(l)%BC=-1
                 LO_Mesh(l)%J_flag=-1
-                LO_Mesh(l)%dx=0.d0
-                LO_Mesh(l)%dy=0.d0
-                LO_Mesh(l)%dl_lo=0.d0
-                LO_Mesh(l)%A_lo=0.d0
-                LO_Mesh(l)%V_lo=0.d0
+                LO_Mesh(l)%dx=0.e0_prec
+                LO_Mesh(l)%dy=0.e0_prec
+                LO_Mesh(l)%dl_lo=0.e0_prec
+                LO_Mesh(l)%A_lo=0.e0_prec
+                LO_Mesh(l)%V_lo=0.e0_prec
                 LO_Mesh(l)%univ=0
                 
                 do t=1, Opt_lo%n_g
@@ -894,10 +896,10 @@ module Input_Reader
                     allocate(LO_Coef(t_tot+l)%J_Net(no_faces))
                     allocate(LO_Coef(t_tot+l)%D_til(no_faces))
                     
-                    LO_Coef(t_tot+l)%Gam=-1.d0
-                    LO_Coef(t_tot+l)%J_Part=0.d0
-                    LO_Coef(t_tot+l)%J_Net=0.d0
-                    LO_Coef(t_tot+l)%D_til=0.d0
+                    LO_Coef(t_tot+l)%Gam=-1.e0_prec
+                    LO_Coef(t_tot+l)%J_Part=0.e0_prec
+                    LO_Coef(t_tot+l)%J_Net=0.e0_prec
+                    LO_Coef(t_tot+l)%D_til=0.e0_prec
                 end do
             end do
             
@@ -933,9 +935,9 @@ module Input_Reader
                 !    call TriEq_Mesher(n_x, n_y, dx, dy, n_tot, IDs_lo, Mesh_Ornt, base_width, height, Centr_lo, Vert_lo, dl, A_lo, V_lo, IDs_neigh_lo)
                 !    ! Removing the influence of the ghost layer
                 !    do l=1, size(Elem_det)
-                !        Elem_det(l)%centroid(1)=Elem_det(l)%centroid(1)+dx/2.d0
+                !        Elem_det(l)%centroid(1)=Elem_det(l)%centroid(1)+dx/2.e0_prec
                 !        Elem_det(l)%centroid(2)=Elem_det(l)%centroid(2)+dy
-                !        Elem_det(l)%vertices(1,:)=Elem_det(l)%vertices(1,:)+dx/2.d0
+                !        Elem_det(l)%vertices(1,:)=Elem_det(l)%vertices(1,:)+dx/2.e0_prec
                 !        Elem_det(l)%vertices(2,:)=Elem_det(l)%vertices(2,:)+dy
                 !    end do
                     
@@ -1108,16 +1110,16 @@ module Input_Reader
             allocate(XS_lo%Dif(Opt_lo%n_g*Opt_lo%n_x*Opt_lo%n_y))
             allocate(XS_lo%Scatt(Opt_lo%n_g*Opt_lo%n_x*Opt_lo%n_y, Opt_lo%n_g))
             
-               XS_lo%Tot=0.d0
-               XS_lo%Tra=0.d0
-              XS_lo%Absr=0.d0
-             XS_lo%nuFis=0.d0
-               XS_lo%Fis=0.d0
-               XS_lo%Chi=0.d0
-              XS_lo%kFis=0.d0
-               XS_lo%Rem=0.d0
-               XS_lo%Dif=0.d0
-             XS_lo%Scatt=0.d0
+               XS_lo%Tot=0.e0_prec
+               XS_lo%Tra=0.e0_prec
+              XS_lo%Absr=0.e0_prec
+             XS_lo%nuFis=0.e0_prec
+               XS_lo%Fis=0.e0_prec
+               XS_lo%Chi=0.e0_prec
+              XS_lo%kFis=0.e0_prec
+               XS_lo%Rem=0.e0_prec
+               XS_lo%Dif=0.e0_prec
+             XS_lo%Scatt=0.e0_prec
             
             ! Data Reordering 
             do l=1, Opt_lo%n_tot
@@ -1193,14 +1195,14 @@ module Input_Reader
         subroutine Quad_Mesher(box_mat_ID, Elem_det, Opt_lo, LO_Mesh, dx_gh, dy_gh) 
             
             integer, intent(in) :: box_mat_ID
-            real(dp), intent(out) :: dx_gh, dy_gh
+            real(prec), intent(out) :: dx_gh, dy_gh
             type(Figure), allocatable, intent(in) :: Elem_det(:)
             type(Options_Data), intent(inout) :: Opt_lo
             type(LO_geom), allocatable, intent(inout) :: LO_Mesh(:)
             
             integer :: i, j, n, l, n_x, n_y, n_tot
             integer :: n_x_mesh, n_tot_mesh, no_faces
-            real(dp) :: dx_homo, dy_homo, dx_part, dy_part, xmin, xmax, ymin, ymax, x_side, y_side
+            real(prec) :: dx_homo, dy_homo, dx_part, dy_part, xmin, xmax, ymin, ymax, x_side, y_side
             
             
             ! Square grid box
@@ -1229,8 +1231,8 @@ module Input_Reader
                 
                 LO_Mesh(l)%Sides_ID=[1, 2, 3, 4]
                 LO_Mesh(l)%Sides_Neigh=[3, 4, 1, 2]
-                LO_Mesh(l)%Cent(:)=0.d0
-                LO_Mesh(l)%Vert(:,:)=0.d0
+                LO_Mesh(l)%Cent(:)=0.e0_prec
+                LO_Mesh(l)%Vert(:,:)=0.e0_prec
                 LO_Mesh(l)%Neigh_ID(:)=-1
                 
                 ! Neighbouring cells from B, counter-clockwise 
@@ -1244,10 +1246,10 @@ module Input_Reader
             LO_Mesh(l)%dy=dy_homo
                 
                 ! Repr. size 
-            LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dy/2.d0  ! B
-            LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx/2.d0  ! R
-            LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dy/2.d0  ! T
-            LO_Mesh(l)%dl_lo(4)=LO_Mesh(l)%dx/2.d0  ! L
+            LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dy/2.e0_prec  ! B
+            LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx/2.e0_prec  ! R
+            LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dy/2.e0_prec  ! T
+            LO_Mesh(l)%dl_lo(4)=LO_Mesh(l)%dx/2.e0_prec  ! L
                 
                 ! Area 
             LO_Mesh(l)%A_lo(1)=LO_Mesh(l)%dx  ! B
@@ -1259,18 +1261,18 @@ module Input_Reader
             LO_Mesh(l)%V_lo=dx_homo*dy_homo
                 
                 ! Centroids 
-                LO_Mesh(l)%Cent(1)=LO_Mesh(l)%dx/2.d0
-                LO_Mesh(l)%Cent(2)=LO_Mesh(l)%dy/2.d0
+                LO_Mesh(l)%Cent(1)=LO_Mesh(l)%dx/2.e0_prec
+                LO_Mesh(l)%Cent(2)=LO_Mesh(l)%dy/2.e0_prec
                 
                 ! From BL, counter-clockwise 
                 ! x 
-                LO_Mesh(l)%Vert(1,1)= 0.d0          ! BL
+                LO_Mesh(l)%Vert(1,1)= 0.e0_prec          ! BL
                 LO_Mesh(l)%Vert(1,2)=LO_Mesh(l)%dx  ! BR
                 LO_Mesh(l)%Vert(1,3)=LO_Mesh(l)%dx  ! TR
-                LO_Mesh(l)%Vert(1,4)= 0.d0          ! TL
+                LO_Mesh(l)%Vert(1,4)= 0.e0_prec          ! TL
                 ! y 
-                LO_Mesh(l)%Vert(2,1)= 0.d0          ! BL
-                LO_Mesh(l)%Vert(2,2)= 0.d0          ! BR
+                LO_Mesh(l)%Vert(2,1)= 0.e0_prec          ! BL
+                LO_Mesh(l)%Vert(2,2)= 0.e0_prec          ! BR
                 LO_Mesh(l)%Vert(2,3)=LO_Mesh(l)%dy  ! TR
                 LO_Mesh(l)%Vert(2,4)=LO_Mesh(l)%dy  ! TL
                 
@@ -1323,13 +1325,13 @@ module Input_Reader
             ! |  /      ! TL mesh
             ! |/  
             integer, intent(in) :: box_mat_ID
-            real(dp), intent(out) :: dx_gh, dy_gh
+            real(prec), intent(out) :: dx_gh, dy_gh
             type(Figure), allocatable, intent(in) :: Elem_det(:)
             type(Options_Data), intent(inout) :: Opt_lo
             type(LO_geom), allocatable, intent(inout) :: LO_Mesh(:)
             
             integer :: i, j, n, l, no_faces, n_x, n_y, n_tot
-            real(dp) :: dx_homo, dy_homo, di_homo, xmin, xmax, ymin, ymax, x_side, y_side
+            real(prec) :: dx_homo, dy_homo, di_homo, xmin, xmax, ymin, ymax, x_side, y_side
                                                                            
             
             ! Square grid box
@@ -1345,7 +1347,7 @@ module Input_Reader
             ! Homogeneous mesh 
             dx_homo=x_side/(Opt_lo%n_x-2) ! First equal side
             dy_homo=dx_homo ! Second equal side
-            di_homo=dx_homo*sqrt(2.d0)
+            di_homo=dx_homo*sqrt(2.e0_prec)
             
             dx_gh=dx_homo
             dy_gh=dx_homo
@@ -1506,7 +1508,7 @@ module Input_Reader
                 
                 
                 ! Manual in-center & Volume calculations FOR ISOSCELE TRIANGLES 
-                LO_Mesh(l)%V_lo=LO_Mesh(l)%dx*LO_Mesh(l)%dy/2.d0
+                LO_Mesh(l)%V_lo=LO_Mesh(l)%dx*LO_Mesh(l)%dy/2.e0_prec
                 
                 ! Mesh orientation discrimination 
                 select case(LO_Mesh(l)%ori) 
@@ -1518,13 +1520,13 @@ module Input_Reader
                         if          (i>1) LO_Mesh(l)%Neigh_ID(3)=l-1       ! L
                         
                         ! Repr. Size
-                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*1.d0/3.d0          ! B
-                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*sqrt((1.d0/3.d0-1.d0/2.d0)**2+(1.d0/3.d0-1.d0/2.d0)**2)           ! TR
-                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*1.d0/3.d0          ! L
+                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec          ! B
+                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*sqrt((1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2+(1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2)           ! TR
+                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec          ! L
                         
                         ! Area 
                         LO_Mesh(l)%A_lo(1)=LO_Mesh(l)%dx               ! B
-                        LO_Mesh(l)%A_lo(2)=LO_Mesh(l)%dx*sqrt(2.d0)    ! TR
+                        LO_Mesh(l)%A_lo(2)=LO_Mesh(l)%dx*sqrt(2.e0_prec)    ! TR
                         LO_Mesh(l)%A_lo(3)=LO_Mesh(l)%dx               ! L
                         
                     case('BR') 
@@ -1534,14 +1536,14 @@ module Input_Reader
                         if (l<=n_tot-n_x) LO_Mesh(l)%Neigh_ID(3)=l+n_x     ! TL
                         
                         ! Repr. Size
-                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*1.d0/3.d0     ! B
-                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*1.d0/3.d0     ! R
-                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*sqrt((1.d0/3.d0-1.d0/2.d0)**2+(1.d0/3.d0-1.d0/2.d0)**2)       ! TL
+                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec     ! B
+                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec     ! R
+                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*sqrt((1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2+(1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2)       ! TL
                         
                         ! Area 
                         LO_Mesh(l)%A_lo(1)=LO_Mesh(l)%dx               ! B
                         LO_Mesh(l)%A_lo(2)=LO_Mesh(l)%dx               ! R
-                        LO_Mesh(l)%A_lo(3)=LO_Mesh(l)%dx*sqrt(2.d0)    ! TL
+                        LO_Mesh(l)%A_lo(3)=LO_Mesh(l)%dx*sqrt(2.e0_prec)    ! TL
                         
                     case('TR') 
                         ! Neighbouring cells from BL, counter-clockwise
@@ -1550,12 +1552,12 @@ module Input_Reader
                         if (j<n_y) LO_Mesh(l)%Neigh_ID(3)=l+n_x     ! T
                         
                         ! Repr. Size
-                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*sqrt((1.d0/3.d0-1.d0/2.d0)**2+(1.d0/3.d0-1.d0/2.d0)**2)       ! BL
-                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*1.d0/3.d0  ! R
-                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*1.d0/3.d0  ! T
+                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*sqrt((1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2+(1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2)       ! BL
+                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec  ! R
+                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec  ! T
                         
                         ! Area 
-                        LO_Mesh(l)%A_lo(1)=LO_Mesh(l)%dx*sqrt(2.d0)    ! BL
+                        LO_Mesh(l)%A_lo(1)=LO_Mesh(l)%dx*sqrt(2.e0_prec)    ! BL
                         LO_Mesh(l)%A_lo(2)=LO_Mesh(l)%dx               ! R
                         LO_Mesh(l)%A_lo(3)=LO_Mesh(l)%dx               ! T
                         
@@ -1566,12 +1568,12 @@ module Input_Reader
                         if   (i>1) LO_Mesh(l)%Neigh_ID(3)=l-1       ! L
                         
                         ! Repr. Size
-                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*sqrt((1.d0/3.d0-1.d0/2.d0)**2+(1.d0/3.d0-1.d0/2.d0)**2)       ! BL
-                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*1.d0/3.d0  ! R
-                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*1.d0/3.d0  ! T
+                        LO_Mesh(l)%dl_lo(1)=LO_Mesh(l)%dx*sqrt((1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2+(1.e0_prec/3.e0_prec-1.e0_prec/2.e0_prec)**2)       ! BL
+                        LO_Mesh(l)%dl_lo(2)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec  ! R
+                        LO_Mesh(l)%dl_lo(3)=LO_Mesh(l)%dx*1.e0_prec/3.e0_prec  ! T
                         
                         ! Area 
-                        LO_Mesh(l)%A_lo(1)=LO_Mesh(l)%dx*sqrt(2.d0)    ! BR
+                        LO_Mesh(l)%A_lo(1)=LO_Mesh(l)%dx*sqrt(2.e0_prec)    ! BR
                         LO_Mesh(l)%A_lo(2)=LO_Mesh(l)%dx               ! T
                         LO_Mesh(l)%A_lo(3)=LO_Mesh(l)%dx               ! L
                         
@@ -1586,66 +1588,66 @@ module Input_Reader
     
         ! Subroutines for TriIso_Mesher    
         subroutine BL_IsoTrng(dx, dy, cent, vert) 
-            real(dp), intent(inout) :: cent(:), vert(:,:)
-            real(dp), intent(in) :: dx, dy
+            real(prec), intent(inout) :: cent(:), vert(:,:)
+            real(prec), intent(in) :: dx, dy
             
-              !cent(1)=  cent(1)+dx*1.d0/3.d0
-              !cent(2)=  cent(2)+dy*1.d0/3.d0
-              cent(1)=  cent(1)+dx*(1.d0-sqrt(2.d0)/2.d0)
-              cent(2)=  cent(2)+dy*(1.d0-sqrt(2.d0)/2.d0)
-            vert(1,1)=vert(1,1)+0.d0
-            vert(2,1)=vert(2,1)+0.d0
+              !cent(1)=  cent(1)+dx*1.e0_prec/3.e0_prec
+              !cent(2)=  cent(2)+dy*1.e0_prec/3.e0_prec
+              cent(1)=  cent(1)+dx*(1.e0_prec-sqrt(2.e0_prec)/2.e0_prec)
+              cent(2)=  cent(2)+dy*(1.e0_prec-sqrt(2.e0_prec)/2.e0_prec)
+            vert(1,1)=vert(1,1)+0.e0_prec
+            vert(2,1)=vert(2,1)+0.e0_prec
             vert(1,2)=vert(1,2)+  dx
-            vert(2,2)=vert(2,2)+0.d0
-            vert(1,3)=vert(1,3)+0.d0
+            vert(2,2)=vert(2,2)+0.e0_prec
+            vert(1,3)=vert(1,3)+0.e0_prec
             vert(2,3)=vert(2,3)+  dy  
         end subroutine BL_IsoTrng
         
         subroutine BR_IsoTrng(dx, dy, cent, vert) 
-            real(dp), intent(inout) :: cent(:), vert(:,:)
-            real(dp), intent(in) :: dx, dy
+            real(prec), intent(inout) :: cent(:), vert(:,:)
+            real(prec), intent(in) :: dx, dy
             
-              !cent(1)=  cent(1)+dx*2.d0/3.d0
-              !cent(2)=  cent(2)+dy*1.d0/3.d0
-              cent(1)=  cent(1)+dx*sqrt(2.d0)/2.d0          ! The in-radius is dx*(1.d0-sqrt(2.d0)/2.d0), which means the in-center
-              cent(2)=  cent(2)+dy*(1.d0-sqrt(2.d0)/2.d0)   ! is at sqrt(2.d0)/2.d0 if the triangle is rotated
-            vert(1,1)=vert(1,1)+0.d0
-            vert(2,1)=vert(2,1)+0.d0
+              !cent(1)=  cent(1)+dx*2.e0_prec/3.e0_prec
+              !cent(2)=  cent(2)+dy*1.e0_prec/3.e0_prec
+              cent(1)=  cent(1)+dx*sqrt(2.e0_prec)/2.e0_prec          ! The in-radius is dx*(1.e0_prec-sqrt(2.e0_prec)/2.e0_prec), which means the in-center
+              cent(2)=  cent(2)+dy*(1.e0_prec-sqrt(2.e0_prec)/2.e0_prec)   ! is at sqrt(2.e0_prec)/2.e0_prec if the triangle is rotated
+            vert(1,1)=vert(1,1)+0.e0_prec
+            vert(2,1)=vert(2,1)+0.e0_prec
             vert(1,2)=vert(1,2)+  dx
-            vert(2,2)=vert(2,2)+0.d0
+            vert(2,2)=vert(2,2)+0.e0_prec
             vert(1,3)=vert(1,3)+  dx
             vert(2,3)=vert(2,3)+  dy  
         end subroutine BR_IsoTrng
         
         subroutine TR_IsoTrng(dx, dy, cent, vert) 
-            real(dp), intent(inout) :: cent(:), vert(:,:)
-            real(dp), intent(in) :: dx, dy
+            real(prec), intent(inout) :: cent(:), vert(:,:)
+            real(prec), intent(in) :: dx, dy
             
-              !cent(1)=  cent(1)+dx*2.d0/3.d0
-              !cent(2)=  cent(2)+dy*2.d0/3.d0
-              cent(1)=  cent(1)+dx*sqrt(2.d0)/2.d0 ! The in-radius is dx*(1.d0-sqrt(2.d0)/2.d0), which means the in-center
-              cent(2)=  cent(2)+dy*sqrt(2.d0)/2.d0 ! is at sqrt(2.d0)/2.d0 if the triangle is rotated
+              !cent(1)=  cent(1)+dx*2.e0_prec/3.e0_prec
+              !cent(2)=  cent(2)+dy*2.e0_prec/3.e0_prec
+              cent(1)=  cent(1)+dx*sqrt(2.e0_prec)/2.e0_prec ! The in-radius is dx*(1.e0_prec-sqrt(2.e0_prec)/2.e0_prec), which means the in-center
+              cent(2)=  cent(2)+dy*sqrt(2.e0_prec)/2.e0_prec ! is at sqrt(2.e0_prec)/2.e0_prec if the triangle is rotated
             vert(1,1)=vert(1,1)+  dx
-            vert(2,1)=vert(2,1)+0.d0
+            vert(2,1)=vert(2,1)+0.e0_prec
             vert(1,2)=vert(1,2)+  dx
             vert(2,2)=vert(2,2)+  dy
-            vert(1,3)=vert(1,3)+0.d0
+            vert(1,3)=vert(1,3)+0.e0_prec
             vert(2,3)=vert(2,3)+  dy 
         end subroutine TR_IsoTrng
         
         subroutine TL_IsoTrng(dx, dy, cent, vert) 
-            real(dp), intent(inout) :: cent(:), vert(:,:)
-            real(dp), intent(in) :: dx, dy
+            real(prec), intent(inout) :: cent(:), vert(:,:)
+            real(prec), intent(in) :: dx, dy
             
-              !cent(1)=  cent(1)+dx*1.d0/3.d0
-              !cent(2)=  cent(2)+dy*2.d0/3.d0
-              cent(1)=  cent(1)+dx*(1.d0-sqrt(2.d0)/2.d0) ! The in-radius is dx*(1.d0-sqrt(2.d0)/2.d0), which means the in-center
-              cent(2)=  cent(2)+dy*sqrt(2.d0)/2.d0        ! is at sqrt(2.d0)/2.d0 if the triangle is rotated
-            vert(1,1)=vert(1,1)+0.d0
-            vert(2,1)=vert(2,1)+0.d0
+              !cent(1)=  cent(1)+dx*1.e0_prec/3.e0_prec
+              !cent(2)=  cent(2)+dy*2.e0_prec/3.e0_prec
+              cent(1)=  cent(1)+dx*(1.e0_prec-sqrt(2.e0_prec)/2.e0_prec) ! The in-radius is dx*(1.e0_prec-sqrt(2.e0_prec)/2.e0_prec), which means the in-center
+              cent(2)=  cent(2)+dy*sqrt(2.e0_prec)/2.e0_prec        ! is at sqrt(2.e0_prec)/2.e0_prec if the triangle is rotated
+            vert(1,1)=vert(1,1)+0.e0_prec
+            vert(2,1)=vert(2,1)+0.e0_prec
             vert(1,2)=vert(1,2)+  dx
             vert(2,2)=vert(2,2)+  dy
-            vert(1,3)=vert(1,3)+0.d0
+            vert(1,3)=vert(1,3)+0.e0_prec
             vert(2,3)=vert(2,3)+  dy  
         end subroutine TL_IsoTrng
     
@@ -1657,25 +1659,25 @@ module Input_Reader
     
     subroutine TriEq_Mesher(n_x, n_y, dx_m, dy_m, n_tot, ID, ori, x_max, y_max, cent, vert, dl, A, Vol, Neigh) 
         integer, intent(in) :: n_x, n_y, n_tot, ID(:)
-        real(dp), intent(in) :: x_max, y_max
+        real(prec), intent(in) :: x_max, y_max
         
         integer, intent(out) ::  Neigh(:,:)
-        real(dp), intent(out) :: cent(:,:), vert(:,:,:), dl(:,:), A(:,:), Vol(:), dx_m, dy_m
+        real(prec), intent(out) :: cent(:,:), vert(:,:,:), dl(:,:), A(:,:), Vol(:), dx_m, dy_m
         character(len=2), allocatable, intent(inout) :: ori(:)
         
         integer :: i, j, n, l
-        real(dp) :: dx, dy
+        real(prec) :: dx, dy
         
         
         ! Homogeneous mesh 
         dx=x_max/(n_x-2)
-        dy=dx*sin(pi/3.d0)
+        dy=dx*sin(pi/3.e0_prec)
         
         dx_m=dx
         dy_m=dy
         
-        cent=0.d0
-        vert=0.d0
+        cent=0.e0_prec
+        vert=0.e0_prec
         Neigh=-1
         
         ! Absolute Centroid & Vertices calculation 
@@ -1685,18 +1687,18 @@ module Input_Reader
                 ! First periodicity
                 n=(j-1)*2*n_x+i
                 l=ID(n)
-                cent(l,1)=(j-1)*dx/2.d0+(i-1)*dx
+                cent(l,1)=(j-1)*dx/2.e0_prec+(i-1)*dx
                 cent(l,2)=(j-1)*dy
-                vert(l,1,:)=(j-1)*dx/2.d0+(i-1)*dx
+                vert(l,1,:)=(j-1)*dx/2.e0_prec+(i-1)*dx
                 vert(l,2,:)=(j-1)*dy
                 ori(l)='U'
                 
                 ! Second periodicity
                 n=(j-1)*2*n_x+n_x+i
                 l=ID(n)
-                cent(l,1)=(j-1)*dx/2.d0+(i-1)*dx+dx/2.d0
+                cent(l,1)=(j-1)*dx/2.e0_prec+(i-1)*dx+dx/2.e0_prec
                 cent(l,2)=(j-1)*dy
-                vert(l,1,:)=(j-1)*dx/2.d0+(i-1)*dx+dx/2.d0
+                vert(l,1,:)=(j-1)*dx/2.e0_prec+(i-1)*dx+dx/2.e0_prec
                 vert(l,2,:)=(j-1)*dy
                 ori(l)='D'
             end do
@@ -1721,20 +1723,20 @@ module Input_Reader
                     A(l,2)=dx   ! TR
                     A(l,3)=dx   ! TL
 
-                    dl(l,1)=dx*sqrt(3.d0)/6.d0  ! B
-                    dl(l,2)=dx*sqrt(3.d0)/6.d0  ! TR
-                    dl(l,3)=dx*sqrt(3.d0)/6.d0  ! TL
+                    dl(l,1)=dx*sqrt(3.e0_prec)/6.e0_prec  ! B
+                    dl(l,2)=dx*sqrt(3.e0_prec)/6.e0_prec  ! TR
+                    dl(l,3)=dx*sqrt(3.e0_prec)/6.e0_prec  ! TL
                     
                     ! Centroids
-                    cent(l,1)=cent(l,1)+dx/2.d0
-                    cent(l,2)=cent(l,2)+sqrt(3.d0)/6.d0*dx
+                    cent(l,1)=cent(l,1)+dx/2.e0_prec
+                    cent(l,2)=cent(l,2)+sqrt(3.e0_prec)/6.e0_prec*dx
                     
                     ! Vertices
-                    vert(l,1,1)=vert(l,1,1)+0.d0    ! BL - x
-                    vert(l,2,1)=vert(l,2,1)+0.d0    ! BL - y
+                    vert(l,1,1)=vert(l,1,1)+0.e0_prec    ! BL - x
+                    vert(l,2,1)=vert(l,2,1)+0.e0_prec    ! BL - y
                     vert(l,1,2)=vert(l,1,2)+dx      ! BR - x
-                    vert(l,2,2)=vert(l,2,2)+0.d0    ! BR - y
-                    vert(l,1,3)=vert(l,1,3)+dx/2.d0 ! T  - x
+                    vert(l,2,2)=vert(l,2,2)+0.e0_prec    ! BR - y
+                    vert(l,1,3)=vert(l,1,3)+dx/2.e0_prec ! T  - x
                     vert(l,2,3)=vert(l,2,3)+dy      ! T  - y
                     
                 case('D') 
@@ -1744,20 +1746,20 @@ module Input_Reader
                                 Neigh(l,2)=l-n_x+1  ! BR
                     if (i>1)    Neigh(l,3)=l+n_x    ! T
 
-                    dl(l,1)=dx*sqrt(3.d0)/6.d0  ! BL
-                    dl(l,2)=dx*sqrt(3.d0)/6.d0  ! BR
-                    dl(l,3)=dx*sqrt(3.d0)/6.d0  ! T
+                    dl(l,1)=dx*sqrt(3.e0_prec)/6.e0_prec  ! BL
+                    dl(l,2)=dx*sqrt(3.e0_prec)/6.e0_prec  ! BR
+                    dl(l,3)=dx*sqrt(3.e0_prec)/6.e0_prec  ! T
                     
                     ! Centroids
-                    cent(l,1)=cent(l,1)+dx/2.d0
-                    cent(l,2)=cent(l,2)+(dy-sqrt(3.d0)/6.d0*dx)
+                    cent(l,1)=cent(l,1)+dx/2.e0_prec
+                    cent(l,2)=cent(l,2)+(dy-sqrt(3.e0_prec)/6.e0_prec*dx)
                     
                     ! Vertices
-                    vert(l,1,1)=vert(l,1,1)+dx/2.d0 ! B  - x
-                    vert(l,2,1)=vert(l,2,1)+0.d0    ! B  - y
+                    vert(l,1,1)=vert(l,1,1)+dx/2.e0_prec ! B  - x
+                    vert(l,2,1)=vert(l,2,1)+0.e0_prec    ! B  - y
                     vert(l,1,2)=vert(l,1,2)+dx      ! TR - x
                     vert(l,2,2)=vert(l,2,2)+dy      ! TR - y
-                    vert(l,1,3)=vert(l,1,3)+0.d0    ! TL - x
+                    vert(l,1,3)=vert(l,1,3)+0.e0_prec    ! TL - x
                     vert(l,2,3)=vert(l,2,3)+dy      ! TL - y
                     
                 case default 
@@ -1766,7 +1768,7 @@ module Input_Reader
                     exit
             end select
             
-            Vol(l)=dx*dy/2.d0
+            Vol(l)=dx*dy/2.e0_prec
         end do
         
     end subroutine TriEq_Mesher

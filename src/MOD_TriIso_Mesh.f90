@@ -1,10 +1,14 @@
 module FVM_TriIso_Alg
     use iso_fortran_env, only : output_unit, error_unit
+    use precision_kinds, only: prec
     use IO_module, only : files
 
 
     use Variables
-    use BiCGSTAB_Algorithm
+    use BiCGSTAB_Solver, only: banded_operator_t, bicgstab_options_t, &
+        bicgstab_result_t, bicgstab_workspace_t, jacobi_preconditioner_t, &
+        symmetric_gauss_seidel_preconditioner_t, ilu0_preconditioner_t, solve_bicgstab, &
+        BICGSTAB_COMPONENT_SUCCESS
     use GaussElimination
     use CMFD_Alg
     use pCMFD_Alg
@@ -34,20 +38,28 @@ module FVM_TriIso_Alg
         type(Accel_Vars_Vect), intent(inout) :: Serv_Vect
         type(Accel_Vars_Matr), intent(inout) :: Serv_Matr
         
-        real(dp), allocatable, intent(out) :: Phi_ext(:)
-        !real(dp), allocatable:: Phi_old_ext(:)
+        real(prec), allocatable, intent(out) :: Phi_ext(:)
+        !real(prec), allocatable:: Phi_old_ext(:)
         
-        integer :: t, j, i, l, g, n, g_red, t_red, t_tot, iter_out_lo, iter_inn_lo, info=0
+        integer :: t, j, i, l, g, n, g_red, t_red, t_tot, iter_out_lo, iter_inn_lo, solver_status
         integer, allocatable :: IDs_Red_Arr(:)
-        real(dp) :: k_lo, k_lo_old, err0, err1, err2, t_ini, t_fin
-        real(dp), allocatable :: a_FVM(:), b_FVM(:), c_FVM(:), d_FVM(:), e_FVM(:)
-        real(dp), allocatable :: XS_nF_Red(:), Chi_Red(:), XS_SC_Red(:,:)
-        real(dp), allocatable :: J_lo(:,:), Phi_lo(:), Phi_lo_old(:), Phi_lo_temp(:), FSD(:), FSD_old(:), S_tot(:)
-        
+        logical, allocatable :: preconditioner_is_ready(:)
+        real(prec) :: k_lo, k_lo_old, err0, err1, err2, t_ini, t_fin
+        real(prec), allocatable, target :: a_FVM(:), b_FVM(:), c_FVM(:), d_FVM(:), e_FVM(:)
+        real(prec), allocatable :: XS_nF_Red(:), Chi_Red(:), XS_SC_Red(:,:)
+        real(prec), allocatable :: J_lo(:,:), Phi_lo(:), Phi_lo_old(:), Phi_lo_temp(:), FSD(:), FSD_old(:), S_tot(:)
+        type(banded_operator_t) :: migration_operator
+        type(bicgstab_options_t) :: solver_options
+        type(bicgstab_result_t) :: solver_result
+        type(bicgstab_workspace_t) :: solver_workspace
+        type(jacobi_preconditioner_t), allocatable :: jacobi_preconditioners(:)
+        type(symmetric_gauss_seidel_preconditioner_t), allocatable :: sgs_preconditioners(:)
+        type(ilu0_preconditioner_t), allocatable :: ilu0_preconditioners(:)
+
         ! Migration Matrix building
         call FVM_TriIso_MatrixBuilder(Opt_lo, LO_Mesh, LO_Param, XS_lo%Rem, XS_lo%Dif, a_FVM, b_FVM, c_FVM, d_FVM, e_FVM)
-        
-        
+
+
         ! Initialization 
         allocate(Phi_ext(Opt_lo%n_tot*Opt_lo%n_g))
         !allocate(Phi_old_ext(Opt_lo%n_tot*Opt_lo%n_g))
@@ -62,11 +74,30 @@ module FVM_TriIso_Alg
         
         IDs_Red_Arr=[(LO_mesh(l)%ID_Red, l=1, Opt_lo%n_tot)]
         k_lo=1.000
-        Phi_lo=1.d0
-        Phi_ext=1.d0
-        err1=1.d0
-	    err2=1.d0
+        Phi_lo=1.e0_prec
+        Phi_ext=1.e0_prec
+        err1=1.e0_prec
+	    err2=1.e0_prec
         iter_out_lo=0
+        solver_options%max_iterations=Opt_lo%it_sol_max
+        solver_options%relative_tolerance=Opt_lo%tol_solv
+        solver_options%absolute_tolerance=0.e0_prec
+        allocate(preconditioner_is_ready(Opt_lo%n_g))
+        preconditioner_is_ready=.false.
+        select case (trim(Opt_lo%preconditioner))
+            case ('Identity')
+                continue
+            case ('Jacobi')
+                allocate(jacobi_preconditioners(Opt_lo%n_g))
+            case ('SGS')
+                allocate(sgs_preconditioners(Opt_lo%n_g))
+            case ('ILU0')
+                allocate(ilu0_preconditioners(Opt_lo%n_g))
+            case default
+                write(output_unit,'(2A)') 'ERROR! UNKNOWN BICGSTAB PRECONDITIONER: ', trim(Opt_lo%preconditioner)
+                write(error_unit,'(2A)') 'ERROR! UNKNOWN BICGSTAB PRECONDITIONER: ', trim(Opt_lo%preconditioner)
+                error stop 'Invalid BiCGSTAB preconditioner selection'
+        end select
         call cpu_time(t_ini)
         
         ! Reduction for the proper source computation 
@@ -109,7 +140,7 @@ module FVM_TriIso_Alg
             FSD_old=FissionSourceDistribution(Opt_lo%n_g, Opt_lo%n_red, Phi_lo_old, XS_nF_Red)
             
             ! Inner iterations (on the energy groups) 
-            err0=1.d0
+            err0=1.e0_prec
             iter_inn_lo=0
             do while (err0>Opt_lo%tol0 .AND. iter_inn_lo<Opt_lo%it_in_max)
                 Phi_lo_temp=Phi_lo
@@ -119,11 +150,55 @@ module FVM_TriIso_Alg
                     t_red=(t-1)*Opt_lo%n_red
                     S_tot(t_red+1:t_red+Opt_lo%n_red)=Total_Source_SingleGroup(t, Opt_lo%n_g, Opt_lo%n_red, k_lo_old, Chi_Red, FSD_old, XS_SC_Red, Phi_lo)
                     
-                    call BiCGSTAB_TriIso(Opt_lo%n_x-2, Opt_lo%n_red, a_FVM(t_red+1:t_red+Opt_lo%n_red), b_FVM(t_red+1:t_red+Opt_lo%n_red), c_FVM(t_red+1:t_red+Opt_lo%n_red), d_FVM(t_red+1:t_red+Opt_lo%n_red), e_FVM(t_red+1:t_red+Opt_lo%n_red), S_tot(t_red+1:t_red+Opt_lo%n_red), Phi_lo(t_red+1:t_red+Opt_lo%n_red), Opt_lo%tol_solv, Opt_lo%it_sol_max, info) 
-                    
-                    if (info==1) then
+                    call migration_operator%bind_triiso(Opt_lo%n_x-2, &
+                        a_FVM(t_red+1:t_red+Opt_lo%n_red), b_FVM(t_red+1:t_red+Opt_lo%n_red), &
+                        c_FVM(t_red+1:t_red+Opt_lo%n_red), d_FVM(t_red+1:t_red+Opt_lo%n_red), &
+                        e_FVM(t_red+1:t_red+Opt_lo%n_red), solver_status)
+                    if (solver_status==BICGSTAB_COMPONENT_SUCCESS) then
+                        select case (trim(Opt_lo%preconditioner))
+                            case ('Identity')
+                                call solve_bicgstab(migration_operator, S_tot(t_red+1:t_red+Opt_lo%n_red), &
+                                    Phi_lo(t_red+1:t_red+Opt_lo%n_red), solver_options, solver_workspace, solver_result)
+                            case ('Jacobi')
+                                if (.not. preconditioner_is_ready(t)) then
+                                    call jacobi_preconditioners(t)%setup(migration_operator, solver_status)
+                                    preconditioner_is_ready(t)=solver_status==BICGSTAB_COMPONENT_SUCCESS
+                                end if
+                                if (solver_status==BICGSTAB_COMPONENT_SUCCESS) then
+                                    call solve_bicgstab(migration_operator, S_tot(t_red+1:t_red+Opt_lo%n_red), &
+                                        Phi_lo(t_red+1:t_red+Opt_lo%n_red), solver_options, solver_workspace, &
+                                        solver_result, jacobi_preconditioners(t))
+                                end if
+                            case ('SGS')
+                                if (.not. preconditioner_is_ready(t)) then
+                                    call sgs_preconditioners(t)%setup(migration_operator, solver_status)
+                                    preconditioner_is_ready(t)=solver_status==BICGSTAB_COMPONENT_SUCCESS
+                                end if
+                                if (solver_status==BICGSTAB_COMPONENT_SUCCESS) then
+                                    call solve_bicgstab(migration_operator, S_tot(t_red+1:t_red+Opt_lo%n_red), &
+                                        Phi_lo(t_red+1:t_red+Opt_lo%n_red), solver_options, solver_workspace, &
+                                        solver_result, sgs_preconditioners(t))
+                                end if
+                            case ('ILU0')
+                                if (.not. preconditioner_is_ready(t)) then
+                                    call ilu0_preconditioners(t)%setup(migration_operator, solver_status)
+                                    preconditioner_is_ready(t)=solver_status==BICGSTAB_COMPONENT_SUCCESS
+                                end if
+                                if (solver_status==BICGSTAB_COMPONENT_SUCCESS) then
+                                    call solve_bicgstab(migration_operator, S_tot(t_red+1:t_red+Opt_lo%n_red), &
+                                        Phi_lo(t_red+1:t_red+Opt_lo%n_red), solver_options, solver_workspace, &
+                                        solver_result, ilu0_preconditioners(t))
+                                end if
+                        end select
+                    end if
+
+                    if (solver_status/=BICGSTAB_COMPONENT_SUCCESS .or. .not. solver_result%converged) then
                         write(output_unit,'(A, I6.1, A)') 'ERROR! THE ', t,' GROUP DID NOT CONVERGE'
                         write(error_unit,'(A, I6.1, A)') 'ERROR! THE ', t,' GROUP DID NOT CONVERGE'
+                        if (solver_status==BICGSTAB_COMPONENT_SUCCESS) then
+                            write(error_unit,'(A, I0, 2A)') 'BiCGSTAB status ', solver_result%status, &
+                                ': ', trim(solver_result%reason)
+                        end if
                         iter_inn_lo=Opt_lo%it_in_max
                     end if
                 end do
@@ -278,16 +353,16 @@ module FVM_TriIso_Alg
         ! IDs_lo_Red = Flag array to go back to the mesh grid w/ ghost meshes (ID_local_Reduced)
 	    ! ===========================================================================================================
         		
-        real(dp), intent(in) :: XS_RM(:), XS_D(:)
-        real(dp), allocatable, intent(out) :: a_MM(:), b_MM(:), c_MM(:), d_MM(:), e_MM(:)
+        real(prec), intent(in) :: XS_RM(:), XS_D(:)
+        real(prec), allocatable, intent(out) :: a_MM(:), b_MM(:), c_MM(:), d_MM(:), e_MM(:)
         
         type(Options_Data), intent(in) :: Opt_lo
         type(LO_geom), allocatable, intent(in) :: LO_Mesh(:)
         type(LO_coeff), allocatable, intent(in) :: LO_Param(:)
         
         integer :: i, j, l, g, g_tot, g_red, u, n, iln, face_ID  ! In-Line Neighbour calculation
-        real(dp) :: bc, D_coeff, temp ! Dummy variable for the Boundary Condition contribution
-        real(dp), allocatable :: a_ToRed(:), b_ToRed(:), c_ToRed(:), d_ToRed(:), e_ToRed(:)
+        real(prec) :: bc, D_coeff, temp ! Dummy variable for the Boundary Condition contribution
+        real(prec), allocatable :: a_ToRed(:), b_ToRed(:), c_ToRed(:), d_ToRed(:), e_ToRed(:)
         
         
         write(output_unit,*) 
@@ -300,11 +375,11 @@ module FVM_TriIso_Alg
         allocate(c_MM(Opt_lo%n_g*OPt_lo%n_red))
         allocate(d_MM(Opt_lo%n_g*OPt_lo%n_red))
         allocate(e_MM(Opt_lo%n_g*OPt_lo%n_red))
-        a_MM=0.d0
-        b_MM=0.d0
-        c_MM=0.d0
-        d_MM=0.d0
-        e_MM=0.d0
+        a_MM=0.e0_prec
+        b_MM=0.e0_prec
+        c_MM=0.e0_prec
+        d_MM=0.e0_prec
+        e_MM=0.e0_prec
         
         n=0
         ! iln = neighbour mesh ID
@@ -358,8 +433,8 @@ module FVM_TriIso_Alg
                                     d_MM(g_red+n)=-D_coeff*LO_Mesh(l)%A_lo(u)/LO_Mesh(l)%V_lo ! BR
                                     b_MM(g_red+n)=b_MM(g_red+n)-d_MM(g_red+n)
                             end select
-                        elseif (LO_Mesh(l)%BC(u)==1 .AND. LO_Param(g_tot+l)%Gam(u)>=0.d0) then
-                            bc = LO_Param(g_tot+l)%Gam(u) / (1.d0+LO_Param(g_tot+l)%Gam(u)*LO_Mesh(l)%dl_lo(u)/XS_D(g_tot+l)) * LO_Mesh(l)%A_lo(u) / LO_Mesh(l)%V_lo
+                        elseif (LO_Mesh(l)%BC(u)==1 .AND. LO_Param(g_tot+l)%Gam(u)>=0.e0_prec) then
+                            bc = LO_Param(g_tot+l)%Gam(u) / (1.e0_prec+LO_Param(g_tot+l)%Gam(u)*LO_Mesh(l)%dl_lo(u)/XS_D(g_tot+l)) * LO_Mesh(l)%A_lo(u) / LO_Mesh(l)%V_lo
                             b_MM(g_red+n) = b_MM(g_red+n) + bc
                         end if
                         
@@ -385,7 +460,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - d_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,1)/V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,1)/V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -398,7 +473,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - e_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -411,7 +486,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - a_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -427,7 +502,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - d_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,1)/V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,1)/V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -440,7 +515,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - c_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -453,7 +528,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - e_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -469,7 +544,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - d_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -482,7 +557,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - e_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -495,7 +570,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - a_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -511,7 +586,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - d_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,1) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,1)/XS_D(g_tot+l)) * A_lo(l,1) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -524,7 +599,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - c_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,2)/XS_D(g_tot+l)) * A_lo(l,2) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -537,7 +612,7 @@ module FVM_TriIso_Alg
 					!			b_MM(g_red+n)=b_MM(g_red+n) - e_MM(g_red+n)
                     !            
 					!		else
-					!			bc = Gam_lo(g_tot+l)/(1.d0+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
+					!			bc = Gam_lo(g_tot+l)/(1.e0_prec+Gam_lo(g_tot+l)*dl(l,3)/XS_D(g_tot+l)) * A_lo(l,3) / V_lo(l)
 					!			b_MM(g_red+n)=b_MM(g_red+n) + bc
                     !            
 					!		end if
@@ -570,27 +645,27 @@ module FVM_TriIso_Alg
     end subroutine FVM_TriIso_MatrixBuilder
     
     pure function Int_Coeff_D(D_loc_1, D_loc_2, dl_1, dl_2) result (D_int) 
-        real(dp), intent(in) :: D_loc_1, D_loc_2, dl_1, dl_2
-        real(dp) :: D_int
+        real(prec), intent(in) :: D_loc_1, D_loc_2, dl_1, dl_2
+        real(prec) :: D_int
         
-        D_int=1.d0/(dl_1/D_loc_1+dl_2/D_loc_2)
+        D_int=1.e0_prec/(dl_1/D_loc_1+dl_2/D_loc_2)
     end function Int_Coeff_D
         
     pure function Phi_Sup(D_loc_1, D_loc_2, dl_1, dl_2, Phi_1, Phi_2) result (Phi_s) 
-        real(dp), intent(in) :: D_loc_1, D_loc_2, dl_1, dl_2, Phi_1, Phi_2
-        real(dp) :: Phi_s
+        real(prec), intent(in) :: D_loc_1, D_loc_2, dl_1, dl_2, Phi_1, Phi_2
+        real(prec) :: Phi_s
         
         Phi_s=(D_loc_1/dl_1*Phi_1+D_loc_2/dl_2*Phi_2)/(D_loc_1/dl_1+D_loc_2/dl_2)
     end function Phi_Sup
     
     pure function FissionSourceDistribution(n_g, n, Phi, XS_nF) result(FSD) 
         integer, intent(in) :: n_g, n
-        real(dp), intent(in) :: Phi(:), XS_nF(:)
-        real(dp) :: FSD(n)
+        real(prec), intent(in) :: Phi(:), XS_nF(:)
+        real(prec) :: FSD(n)
         
         integer :: t
         
-        FSD=0.d0
+        FSD=0.e0_prec
         do t=1, n_g
             FSD(:)=FSD(:)+Phi((t-1)*n+1:t*n)*XS_nF((t-1)*n+1:t*n)
         end do
@@ -599,12 +674,12 @@ module FVM_TriIso_Alg
     
     pure function Total_Source_SingleGroup(t, n_g, n_red, k, Chi, FSD, XS_SC, Phi) result(S_tot) 
         integer, intent(in) :: t, n_g, n_red 
-        real(dp), intent(in) :: k, Chi(:), FSD(:), XS_SC(:,:), Phi(:)
+        real(prec), intent(in) :: k, Chi(:), FSD(:), XS_SC(:,:), Phi(:)
         
         integer :: g, t_red, g_red
-        real(dp) :: S_tot(n_red)
+        real(prec) :: S_tot(n_red)
         
-        S_tot=0.d0
+        S_tot=0.e0_prec
         t_red=(t-1)*n_red
         
         S_tot(:)=S_tot(:)+Chi(t_red+1:t_red+n_red)/k*FSD(:)
@@ -618,12 +693,12 @@ module FVM_TriIso_Alg
     
     pure function Total_Source(n_g, n_red, k, Chi, FSD, XS_SC, Phi) result(S_tot) 
         integer, intent(in) :: n_g, n_red 
-        real(dp), intent(in) :: k, Chi(:), FSD(:), XS_SC(:,:), Phi(:)
+        real(prec), intent(in) :: k, Chi(:), FSD(:), XS_SC(:,:), Phi(:)
         
         integer :: t, g, t_red, g_red
-        real(dp) :: S_tot(n_g*n_red)
+        real(prec) :: S_tot(n_g*n_red)
         
-        S_tot=0.d0
+        S_tot=0.e0_prec
         do t=1, n_g
             t_red=(t-1)*n_red
             S_tot(t_red+1:t_red+n_red)=S_tot(t_red+1:t_red+n_red)+Chi(t_red+1:t_red+n_red)/k*FSD(:)
@@ -637,13 +712,13 @@ module FVM_TriIso_Alg
     end function Total_Source
     
     !subroutine MM_Printing(n_g, n_x, n, a, b, c, d, e) 
-    !    real(dp), intent(in) :: a(:), b(:), c(:), d(:), e(:)
-    !    real(dp) :: MM(n_g*n, n_g*n)
+    !    real(prec), intent(in) :: a(:), b(:), c(:), d(:), e(:)
+    !    real(prec) :: MM(n_g*n, n_g*n)
     !    integer :: g, g_red, i
     !    integer, intent(in) :: n_g, n, n_x
     !    
     !    ! Explicit matrix building
-    !    MM=0.d0
+    !    MM=0.e0_prec
     !    
     !    do g=1,n_g
     !        g_red=(g-1)*n
@@ -667,12 +742,12 @@ module FVM_TriIso_Alg
     
     subroutine Phi_Extender(IDs_lo_Red, n_tot_lo, n_red, n_g_lo, Phi_red, Phi_ext) 
         integer, intent(in) :: IDs_lo_Red(:), n_tot_lo, n_red, n_g_lo
-        real(dp), intent(in) :: Phi_red(:)
+        real(prec), intent(in) :: Phi_red(:)
         
         integer :: l, t, t_tot, t_red
-        real(dp), intent(out) :: Phi_ext(:)
+        real(prec), intent(out) :: Phi_ext(:)
         
-        Phi_ext=0.d0
+        Phi_ext=0.e0_prec
         do l=1, n_tot_lo
             do t=1, n_g_lo
                 t_tot=(t-1)*n_tot_lo
@@ -684,14 +759,14 @@ module FVM_TriIso_Alg
     end subroutine Phi_Extender
 
     subroutine Local_Currents_TriIso(Opt_lo, LO_Mesh, LO_Param, XS_D, Phi_lo) 
-        real(dp), intent(in) :: XS_D(:), Phi_lo(:)
+        real(prec), intent(in) :: XS_D(:), Phi_lo(:)
         
         type(Options_Data), intent(in) :: Opt_lo
         type(LO_geom), intent(in):: LO_Mesh(:)
         type(LO_coeff), intent(inout) :: LO_Param(:)
         
         integer :: l, t, u, n, t_tot, iln_tot, face_ID
-        real(dp) :: D_tilde, Phi_s
+        real(prec) :: D_tilde, Phi_s
         
         n=0
         do l=1, Opt_lo%n_tot
@@ -701,8 +776,8 @@ module FVM_TriIso_Alg
                 ! Roll on the E groups
                 do t=1, Opt_lo%n_g
                     t_tot=(t-1)*Opt_lo%n_tot
-                    LO_Param(t_tot+l)%J_net=0.d0
-                    LO_Param(t_tot+l)%J_part=0.d0
+                    LO_Param(t_tot+l)%J_net=0.e0_prec
+                    LO_Param(t_tot+l)%J_part=0.e0_prec
                     
                     ! Roll on the sides
                     do u=1, size(LO_Mesh(l)%Neigh_ID)
@@ -721,25 +796,25 @@ module FVM_TriIso_Alg
                             LO_Param(t_tot+l)%J_net(u)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
                             
                             ! Partial
-                            LO_Param(t_tot+l)%J_part(u,1)=Phi_s/4.d0-D_tilde/2.d0*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
-                            LO_Param(t_tot+l)%J_part(u,2)=Phi_s/4.d0+D_tilde/2.d0*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
+                            LO_Param(t_tot+l)%J_part(u,1)=Phi_s/4.e0_prec-D_tilde/2.e0_prec*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
+                            LO_Param(t_tot+l)%J_part(u,2)=Phi_s/4.e0_prec+D_tilde/2.e0_prec*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
                         
                         else
                             LO_Param(t_tot+l)%D_til(u)=XS_D(t_tot+l)
                             
                             ! Net
-                            LO_Param(t_tot+l)%J_net(u)=LO_Param(t_tot+l)%Gam(u) / (1.d0+LO_Param(t_tot+l)%Gam(u)*LO_Mesh(l)%dl_lo(u)/XS_D(t_tot+l)) * Phi_lo(t_tot+l)
+                            LO_Param(t_tot+l)%J_net(u)=LO_Param(t_tot+l)%Gam(u) / (1.e0_prec+LO_Param(t_tot+l)%Gam(u)*LO_Mesh(l)%dl_lo(u)/XS_D(t_tot+l)) * Phi_lo(t_tot+l)
                             
                             ! Partial
-                            !Phi_s=(XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.d0) / (XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.d0+(LO_Param(t_tot+l)%Gam(u)-1/4.d0)) * Phi_lo(t_tot+l)
-                            !LO_Param(t_tot+l)%J_part(u,1)=Phi_s/4.d0-D_tilde/2.d0*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
+                            !Phi_s=(XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.e0_prec) / (XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.e0_prec+(LO_Param(t_tot+l)%Gam(u)-1/4.e0_prec)) * Phi_lo(t_tot+l)
+                            !LO_Param(t_tot+l)%J_part(u,1)=Phi_s/4.e0_prec-D_tilde/2.e0_prec*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
                             !
-                            !Phi_s=(XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.d0) / (XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.d0+(LO_Param(t_tot+l)%Gam(u)+1/4.d0)) * Phi_lo(t_tot+l)
-                            !LO_Param(t_tot+l)%J_part(u,2)=Phi_s/4.d0+D_tilde/2.d0*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
+                            !Phi_s=(XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.e0_prec) / (XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)/2.e0_prec+(LO_Param(t_tot+l)%Gam(u)+1/4.e0_prec)) * Phi_lo(t_tot+l)
+                            !LO_Param(t_tot+l)%J_part(u,2)=Phi_s/4.e0_prec+D_tilde/2.e0_prec*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
                             
                             Phi_s=(XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)) / (LO_Param(t_tot+l)%Gam(u)+XS_D(t_tot+l)/LO_Mesh(l)%dl_lo(u)) * Phi_lo(t_tot+l)
-                            LO_Param(t_tot+l)%J_part(u,1)=(0.5d0+LO_Param(t_tot+l)%Gam(u)) * Phi_s/2.d0
-                            LO_Param(t_tot+l)%J_part(u,2)=(0.5d0-LO_Param(t_tot+l)%Gam(u)) * Phi_s/2.d0
+                            LO_Param(t_tot+l)%J_part(u,1)=(0.5e0_prec+LO_Param(t_tot+l)%Gam(u)) * Phi_s/2.e0_prec
+                            LO_Param(t_tot+l)%J_part(u,2)=(0.5e0_prec-LO_Param(t_tot+l)%Gam(u)) * Phi_s/2.e0_prec
                         end if
                     end do
                     
@@ -757,7 +832,7 @@ module FVM_TriIso_Alg
         
         
         
-        !J_lo=0.d0
+        !J_lo=0.e0_prec
         !do l=1, n_tot_lo
         !    if (J_map_lo(l)>-1) then
         !        do t=1, n_g_lo
@@ -771,7 +846,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,2), dl_lo(l,1))
         !                        J_lo(t_tot+l,1)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Top-Right Neighbour
@@ -780,7 +855,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,1), dl_lo(l,2))
         !                        J_lo(t_tot+l,2)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Left Neighbour
@@ -789,7 +864,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,2), dl_lo(l,3))
         !                        J_lo(t_tot+l,3)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                case('BR') 
@@ -799,7 +874,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,3), dl_lo(l,1))
         !                        J_lo(t_tot+l,1)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Right Neighbour
@@ -808,7 +883,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,3), dl_lo(l,2))
         !                        J_lo(t_tot+l,2)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Top-Left Neighbour
@@ -817,7 +892,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,1), dl_lo(l,3))
         !                        J_lo(t_tot+l,3)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                case('TL') 
@@ -827,7 +902,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,3), dl_lo(l,1))
         !                        J_lo(t_tot+l,1)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Right Neighbour 
@@ -836,7 +911,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,1), dl_lo(l,2))
         !                        J_lo(t_tot+l,2)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Top Neighbour 
@@ -845,7 +920,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,2), dl_lo(l,3))
         !                        J_lo(t_tot+l,3)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                case('TR') 
@@ -855,7 +930,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,2), dl_lo(l,1))
         !                        J_lo(t_tot+l,1)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,1)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,1)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Right Neighbour 
@@ -864,7 +939,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,3), dl_lo(l,2))
         !                        J_lo(t_tot+l,2)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,2)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,2)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !                    ! Top Neighbour 
@@ -873,7 +948,7 @@ module FVM_TriIso_Alg
         !                        D_tilde=Int_Coeff_D(XS_D_lo(t_tot+iln_tot), XS_D_lo(t_tot+l), dl_lo(iln_tot,1), dl_lo(l,3))
         !                        J_lo(t_tot+l,3)=-D_tilde*(Phi_lo(t_tot+iln_tot)-Phi_lo(t_tot+l))
         !                    else
-        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.d0+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
+        !                        J_lo(t_tot+l,3)=Gam_lo(t_tot+l)/(1.e0_prec+Gam_lo(t_tot+l)*dl_lo(l,3)/XS_D_lo(t_tot+l))*Phi_lo(t_tot+l)
         !                    end if
         !                    
         !            end select

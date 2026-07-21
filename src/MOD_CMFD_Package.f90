@@ -1,4 +1,5 @@
 module CMFD_Alg
+    use precision_kinds, only: prec
     use Variables
     use BiCGSTAB_Algorithm
     use GaussElimination
@@ -21,15 +22,15 @@ module CMFD_Alg
             type(Accel_Vars_Vect), intent(inout) :: Serv_Vect
             type(Accel_Vars_Matr), intent(inout) :: Serv_Matr
             
-            real(dp), allocatable, intent(inout) :: Phi_lo(:)
+            real(prec), allocatable, intent(inout) :: Phi_lo(:)
             
             
             integer :: i, j, l, u, t, g, t_tot, g_tot, iter_out_gl, iter_in_gl, info
-            real(dp) :: err0, err1, err2, k_old_gl, k_gl, Phi_avg_lo(Opt_gl%n_g*Opt_gl%n_tot)
-            real(dp), allocatable :: eigens_R(:), eigens_I(:), Phi_lo_temp(:)
+            real(prec) :: err0, err1, err2, k_old_gl, k_gl, Phi_avg_lo(Opt_gl%n_g*Opt_gl%n_tot)
+            real(prec), allocatable :: eigens_R(:), eigens_I(:), Phi_lo_temp(:)
             
             integer :: ll, t_red
-            real(dp) :: tempRR(Opt_gl%n_g*Opt_gl%n_tot)
+            real(prec) :: tempRR(Opt_gl%n_g*Opt_gl%n_tot)
             
             
             ! Current calculation
@@ -63,10 +64,10 @@ module CMFD_Alg
             
             
             ! Initialization 
-            err0=1.d0
-            err1=1.d0
-            err2=1.d0
-            k_gl=1.d0
+            err0=1.e0_prec
+            err1=1.e0_prec
+            err2=1.e0_prec
+            k_gl=1.e0_prec
             iter_out_gl=0
             
             ! Outer global iterations 
@@ -76,7 +77,7 @@ module CMFD_Alg
                 Serv_Vect%Phi_old=Serv_Vect%Phi
                 
                 ! Fission Source building 
-                Serv_Vect%S_fiss_old=0.d0
+                Serv_Vect%S_fiss_old=0.e0_prec
                 do t=1, Opt_gl%n_g
                     t_tot=(t-1)*Opt_gl%n_tot
                     Serv_Vect%S_fiss_old(1:Opt_gl%n_tot)=Serv_Vect%S_fiss_old(1:Opt_gl%n_tot)+Serv_Vect%Phi_old(t_tot+1:t_tot+Opt_gl%n_tot)*XS_gl%nuFis(t_tot+1:t_tot+Opt_gl%n_tot)
@@ -84,7 +85,7 @@ module CMFD_Alg
                 
                 ! Inner iterations 
                 iter_in_gl=0
-                err0=1.d0
+                err0=1.e0_prec
                 do while (err0>Opt_gl%tol0 .AND. iter_in_gl<Opt_gl%it_in_max)
                     iter_in_gl=iter_in_gl+1
                     Serv_Vect%Phi_temp=Serv_Vect%Phi
@@ -119,7 +120,7 @@ module CMFD_Alg
                 end do
                 
                 ! Fission Source building 
-                Serv_Vect%S_fiss=0.d0
+                Serv_Vect%S_fiss=0.e0_prec
                 do t=1, Opt_gl%n_g
                     t_tot=(t-1)*Opt_gl%n_tot
                     Serv_Vect%S_fiss(1:Opt_gl%n_tot)=Serv_Vect%S_fiss(1:Opt_gl%n_tot)+Serv_Vect%Phi(t_tot+1:t_tot+Opt_gl%n_tot)*XS_gl%nuFis(t_tot+1:t_tot+Opt_gl%n_tot)
@@ -156,7 +157,7 @@ module CMFD_Alg
         
         
         subroutine D_tilde_Build(Opt_gl, GL_Mesh, D_gl, GL_Param) 
-            real(dp), intent(in) :: D_gl(:)
+            real(prec), intent(in) :: D_gl(:)
             
             type(Options_Data), intent(in) :: Opt_gl
             type(GL_geom), intent(in) :: GL_Mesh(:)
@@ -165,7 +166,7 @@ module CMFD_Alg
             integer :: l, t, n, t_tot, nb, nb_side
             
             do l=1, size(GL_Param)
-                GL_Param(l)%D_Til=0.d0
+                GL_Param(l)%D_Til=0.e0_prec
             end do
             
             do l=1, Opt_gl%n_tot 
@@ -190,7 +191,7 @@ module CMFD_Alg
         end subroutine D_tilde_Build
         
         subroutine D_Hat_Build(Opt_gl, Phi_Ref, GL_Mesh, GL_Param) 
-            real(dp), intent(in) :: Phi_Ref(:)
+            real(prec), intent(in) :: Phi_Ref(:)
             
             type(Options_Data), intent(in) :: Opt_gl
             type(GL_geom), intent(in) :: GL_Mesh(:)
@@ -220,21 +221,21 @@ module CMFD_Alg
         end subroutine D_Hat_Build
         
         subroutine MigrMat_Impl(Opt_gl, XS_RM, GL_Mesh, Gl_Param, a_MM, b_MM, c_MM, d_MM, e_MM) 
-            real(dp), intent(in) :: XS_RM(:)
+            real(prec), intent(in) :: XS_RM(:)
             
             type(Options_data), intent(in) :: Opt_gl
             type(GL_geom), intent(in) :: GL_Mesh(:)
             type(GL_coeff), intent(in) :: GL_Param(:)
             
-            real(dp), intent(out) :: a_MM(:), b_MM(:), c_MM(:), d_MM(:), e_MM(:)
+            real(prec), intent(out) :: a_MM(:), b_MM(:), c_MM(:), d_MM(:), e_MM(:)
             
             integer :: t, l, t_tot, i, j
             
             
-            a_MM=0.d0
-            c_MM=0.d0
-            d_MM=0.d0
-            e_MM=0.d0
+            a_MM=0.e0_prec
+            c_MM=0.e0_prec
+            d_MM=0.e0_prec
+            e_MM=0.e0_prec
             
             b_MM=XS_RM
             
@@ -284,18 +285,18 @@ module CMFD_Alg
         end subroutine MigrMat_Impl
         
         subroutine MigrMat_Expl(Opt_gl, XS_RM, GL_Mesh, GL_Param, MM) 
-            real(dp), intent(in) :: XS_RM(:)
+            real(prec), intent(in) :: XS_RM(:)
             
             type(Options_Data), intent(in) :: Opt_gl
             type(GL_geom), intent(in) :: GL_Mesh(:)
             type(GL_coeff), intent(in) :: GL_Param(:)
             
-            real(dp), intent(out) :: MM(:,:)
+            real(prec), intent(out) :: MM(:,:)
             
             integer :: i, j, t, l, t_tot
             
             
-            MM=0.d0
+            MM=0.e0_prec
             
             do t=1, Opt_gl%n_g
                 t_tot=(t-1)*Opt_gl%n_tot
