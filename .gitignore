@@ -30,6 +30,7 @@ htmlcov/
 
 # Generated runtime data and scratch files
 /output/**
+!/output/README.md
 /temp/**
 
 # Editor and operating-system metadata
