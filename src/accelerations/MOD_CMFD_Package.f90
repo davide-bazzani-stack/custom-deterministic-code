@@ -1,7 +1,6 @@
 module CMFD_Alg
     use precision_kinds, only: prec
     use Variables
-    use BiCGSTAB_Algorithm
     use GaussElimination
     use Service_Fcns
         implicit none
@@ -25,7 +24,7 @@ module CMFD_Alg
             real(prec), allocatable, intent(inout) :: Phi_lo(:)
             
             
-            integer :: i, j, l, u, t, g, t_tot, g_tot, iter_out_gl, iter_in_gl, info
+            integer :: i, j, l, u, t, g, t_tot, g_tot, iter_out_gl, iter_in_gl
             real(prec) :: err0, err1, err2, k_old_gl, k_gl, Phi_avg_lo(Opt_gl%n_g*Opt_gl%n_tot)
             real(prec), allocatable :: eigens_R(:), eigens_I(:), Phi_lo_temp(:)
             
@@ -103,14 +102,6 @@ module CMFD_Alg
                         
                         call GE_Expl_Main(Opt_gl%n_tot, Serv_Matr%MM(t_tot+1:t_tot+Opt_gl%n_tot,t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%source(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%Phi(t_tot+1:t_tot+Opt_gl%n_tot))
                         !call Schur_Complement_Vect(Opt_gl%n_tot, Serv_Vect%a(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%b(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%c(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%source(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%Phi(t_tot+1:t_tot+Opt_gl%n_tot))
-                        !call BiCGSTAB_Classic(Opt_gl%n_x, Opt_gl%n_tot, Serv_Vect%a(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%b(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%c(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%d(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%e(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%source(t_tot+1:t_tot+Opt_gl%n_tot), Serv_Vect%Phi(t_tot+1:t_tot+Opt_gl%n_tot), Opt_gl%tol_solv, Opt_gl%it_sol_max, info)
-                        !if (info==1) then      
-                        !    write(*,'(A, I6.1, A)') 'ERROR! THE ', t,' GROUP IN THE HGCMFD DID NOT CONVERGE'
-                        !    write(1,'(A, I6.1, A)') 'ERROR! THE ', t,' GROUP IN THE HGCMFD DID NOT CONVERGE'
-                        !end if
-                        
-                        
-                        
                         ! Be careful in the a and c arrays!!
                         
                         

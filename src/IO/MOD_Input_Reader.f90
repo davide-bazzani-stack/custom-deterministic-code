@@ -49,7 +49,9 @@ module Input_Reader
                 if (index(file_line, '% Local') > 0) then 
                     
                     ! Sentinel values 
+                    Opt_lo%linear_solver='BiCGSTAB' ! Temporary hardcoded selection
                     Opt_lo%preconditioner='Identity' ! Temporary hardcoded selection
+                    Opt_lo%eigen_spectrum_analysis=.false. ! Temporary hardcoded selection
                     mesh_strc%variable=''
                     flag_ms%value=-1
                     n_x%value=0

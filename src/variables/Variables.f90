@@ -46,7 +46,9 @@ module Variables
         integer :: flag_ms, n_x, n_y, n_tot, n_g, n_red
         integer :: it_sol_max, it_out_max, it_in_max
         real(prec) :: tol_solv, tol0, tol1, tol2
+        character(len=16) :: linear_solver
         character(len=16) :: preconditioner
+        logical :: eigen_spectrum_analysis = .false.
         integer :: flag_SOR
         real(prec) :: w_SOR
     end type

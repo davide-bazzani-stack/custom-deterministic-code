@@ -11,7 +11,8 @@
       "displayName": "Debug",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTING": "OFF"
       }
     },
     {
@@ -19,7 +20,26 @@
       "displayName": "Release",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "test-debug",
+      "displayName": "Test Debug",
+      "binaryDir": "${sourceDir}/tests/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "test-release",
+      "displayName": "Test Release",
+      "binaryDir": "${sourceDir}/tests/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON"
       }
     }
   ],
@@ -31,6 +51,43 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "test-debug",
+      "configurePreset": "test-debug",
+      "targets": [
+        "fvm_unit_tests"
+      ]
+    },
+    {
+      "name": "test-release",
+      "configurePreset": "test-release",
+      "targets": [
+        "fvm_unit_tests"
+      ]
+    },
+    {
+      "name": "eigen-benchmark-release",
+      "configurePreset": "test-release",
+      "targets": [
+        "fvm_eigen_benchmark"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-debug",
+      "configurePreset": "test-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "test-release",
+      "configurePreset": "test-release",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

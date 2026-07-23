@@ -24,6 +24,23 @@ Rules for every implementation step:
 - [ ] Keep pure stateless kernels procedural; use OOP only for ownership, lifecycle,
   validation, and interchangeable strategies.
 
+## Current refactoring status
+
+- [x] Solvers have been updated and moved into the refactored solver structure.
+- [x] BiCGSTAB, Gaussian-elimination, eigenvalue, LAPACK-interface, and solver test
+  files are now represented in the new source/test layout.
+- [x] `MOD_DebugChecks.f90` has been refactored; reaction-rate data can now be
+  prepared and printed through the refactored path.
+- [ ] Verify the refactored solver test suite from a clean build directory and
+  record compiler, flags, residual tolerances, and test output.
+- [ ] Proceed with the next routine-level refactors in this order:
+  1. Current-calculation objects and interfaces.
+  2. Migration-matrix construction objects and interfaces.
+  3. Recurrent/common numerical routines still coupled to acceleration setup.
+  4. Acceleration-package orchestration routines.
+  5. Quad and triangular mesh routines.
+  6. I/O, input-reader, and output lifecycle routines.
+
 ## P0 — Tests, linear-solver correctness, and measured optimization
 
 ### P0.1 Establish the safety net
@@ -185,7 +202,8 @@ Rules for every implementation step:
   - [ ] Initialize scalar components deterministically.
   - [ ] Make modules `private` by default and expose explicit APIs.
   - [ ] Use `use ..., only:` imports.
-- [ ] Reorganize `MOD_Recurrent_Functions.f90` into focused modules.
+- [ ] Reorganize `MOD_Recurrent_Functions.f90` into focused modules. **Next routine
+  refactor after current and migration objects.**
   - [ ] Normalization.
   - [ ] Geometry predicates/distances.
   - [ ] Results formatting.
@@ -212,6 +230,8 @@ Rules for every implementation step:
 - [ ] Introduce `linear_solver_options_t`, `linear_solver_result_t`, and reusable
   solver workspaces.
 - [ ] Introduce concrete band and arrow operators with tested `apply` operations.
+- [ ] Implement current-calculation objects and interfaces.
+- [ ] Implement migration-matrix construction objects and interfaces.
 - [ ] Share one fine-mesh iteration controller between Quad and TriIso.
   - [ ] Keep topology-specific stencil assembly and current reconstruction concrete.
   - [ ] Share source, convergence, logging-status, and accelerator-dispatch logic.
@@ -226,7 +246,8 @@ Rules for every implementation step:
 ### P1.5 Complete output-I/O lifecycle refactoring
 
 - [ ] Evolve `output_files_t` into an owned/injected output manager with output
-  root, enable flags, open state, and error policy.
+  root, enable flags, open state, and error policy. **Next routine refactor group:
+  I/O/output.**
 - [ ] Remove numerical-kernel dependence on the global `files` singleton.
 - [ ] Make every `write(files%..., ...)` conditional on a valid enabled/open stream,
   or expose safe manager write methods.
@@ -267,10 +288,11 @@ Rules for every implementation step:
 - [ ] Move migration-matrix diagnostic formatting into a dedicated debug module.
   - [ ] Keep construction independent of formatting and file output.
   - [ ] Route output through the output manager's debug stream.
-- [ ] Refactor `MOD_DebugChecks.f90`.
-  - [ ] Separate reaction-rate calculation from diagnostic writing.
-  - [ ] Remove full-size temporary arrays where streaming/small workspace suffices.
-  - [ ] Make scattering headers group-count aware.
+- [x] Refactor `MOD_DebugChecks.f90`.
+  - [x] Separate reaction-rate calculation from diagnostic writing.
+  - [x] Prepare and print reaction-rate data through the refactored debug path.
+  - [x] Remove full-size temporary arrays where streaming/small workspace suffices.
+  - [x] Make scattering headers group-count aware.
 - [ ] Confirm pHGCMFD correction formulas, including the unused diffusion argument
   and hard-coded surface-flux term, with domain reference data.
 - [ ] Decide and document whether `Crfc` `A_gl` means area or circumference.

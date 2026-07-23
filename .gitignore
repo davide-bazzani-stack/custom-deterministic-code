@@ -1,5 +1,6 @@
 # Generated build trees
 /build/
+/tests/build/
 /cmake-build-*/
 CMakeUserPresets.json
 

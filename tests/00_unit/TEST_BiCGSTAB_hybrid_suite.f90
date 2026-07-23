@@ -22,10 +22,10 @@ contains
         type(unittest_type), allocatable, intent(out) :: testsuite(:)
 
         testsuite = [ &
-            new_unittest("hybrid_classic_legacy_parity", &
-                hybrid_classic_legacy_parity), &
-            new_unittest("hybrid_triiso_legacy_parity", &
-                hybrid_triiso_legacy_parity), &
+            new_unittest("bicgstab_cartesian_known_solution", &
+                bicgstab_cartesian_known_solution), &
+            new_unittest("bicgstab_triiso_known_solution", &
+                bicgstab_triiso_known_solution), &
             new_unittest("hybrid_preconditioner_variants", &
                 hybrid_preconditioner_variants), &
             new_unittest("hybrid_preconditioner_actions", &
@@ -41,34 +41,23 @@ contains
             ]
     end subroutine collect_suite_BiCGSTAB_hybrid
 
-    subroutine hybrid_classic_legacy_parity(error)
-        use BiCGSTAB_Algorithm, only : BiCGSTAB_Classic
-
+    subroutine bicgstab_cartesian_known_solution(error)
         type(error_type), allocatable, intent(out) :: error
 
         integer, parameter :: n_x = 3
         integer, parameter :: n = 9
         real(prec), target :: a(n), b(n), c(n), d(n), e(n)
         real(prec) :: matrix(n,n), rhs(n), reference(n)
-        real(prec) :: legacy_solution(n), hybrid_solution(n)
+        real(prec) :: solution(n)
         type(banded_operator_t) :: operator
         type(bicgstab_options_t) :: options
         type(bicgstab_result_t) :: result
         type(bicgstab_workspace_t) :: workspace
-        integer :: legacy_info, status
-        real(prec) :: tolerance
+        integer :: status
 
         call build_classic_fixture(a, b, c, d, e, matrix, reference)
         rhs = matmul(matrix, reference)
-        legacy_solution = 0.0_prec
-        hybrid_solution = 0.0_prec
-        tolerance = solver_tolerance()
-
-        call BiCGSTAB_Classic(n_x, n, a, b, c, d, e, rhs, &
-            legacy_solution, tolerance, 200, legacy_info)
-        call check(error, legacy_info, 0, &
-            message="[SYSTEM] TEST ERROR: legacy Classic solver failed")
-        if (allocated(error)) return
+        solution = 0.0_prec
 
         call operator%bind_cartesian_pentadiagonal(1, n_x, &
             a, b, c, d, e, status)
@@ -77,47 +66,34 @@ contains
         if (allocated(error)) return
 
         call configure_options(options, 200)
-        call solve_bicgstab(operator, rhs, hybrid_solution, options, &
+        call solve_bicgstab(operator, rhs, solution, options, &
             workspace, result)
-        call assert_result_success(result, "hybrid Classic solver failed", error)
+        call assert_result_success(result, "Cartesian BiCGSTAB solver failed", error)
         if (allocated(error)) return
-
-        call assert_solution(hybrid_solution, legacy_solution, check_tolerance(), &
-            "hybrid Classic result differs from legacy", error)
+        call assert_solution(solution, reference, check_tolerance(), &
+            "Cartesian BiCGSTAB solution mismatch", error)
         if (allocated(error)) return
-        call assert_solution(hybrid_solution, reference, check_tolerance(), &
-            "hybrid Classic solution mismatch", error)
-        if (allocated(error)) return
-        call assert_dense_residual(matrix, hybrid_solution, rhs, check_tolerance(), &
-            "hybrid Classic residual too large", error)
-    end subroutine hybrid_classic_legacy_parity
+        call assert_dense_residual(matrix, solution, rhs, check_tolerance(), &
+            "Cartesian BiCGSTAB residual too large", error)
+    end subroutine bicgstab_cartesian_known_solution
 
-    subroutine hybrid_triiso_legacy_parity(error)
-        use BiCGSTAB_Algorithm, only : BiCGSTAB_TriIso
-
+    subroutine bicgstab_triiso_known_solution(error)
         type(error_type), allocatable, intent(out) :: error
 
         integer, parameter :: n_x = 4
         integer, parameter :: n = 8
         real(prec), target :: a(n), b(n), c(n), d(n), e(n)
         real(prec) :: matrix(n,n), rhs(n), reference(n)
-        real(prec) :: legacy_solution(n), hybrid_solution(n)
+        real(prec) :: solution(n)
         type(banded_operator_t) :: operator
         type(bicgstab_options_t) :: options
         type(bicgstab_result_t) :: result
         type(bicgstab_workspace_t) :: workspace
-        integer :: legacy_info, status
+        integer :: status
 
         call build_triiso_fixture(a, b, c, d, e, matrix, reference)
         rhs = matmul(matrix, reference)
-        legacy_solution = 0.0_prec
-        hybrid_solution = 0.0_prec
-
-        call BiCGSTAB_TriIso(n_x, n, a, b, c, d, e, rhs, &
-            legacy_solution, solver_tolerance(), 200, legacy_info)
-        call check(error, legacy_info, 0, &
-            message="[SYSTEM] TEST ERROR: legacy TriIso solver failed")
-        if (allocated(error)) return
+        solution = 0.0_prec
 
         call operator%bind_triiso(n_x, a, b, c, d, e, status)
         call check(error, status, 0, &
@@ -125,17 +101,16 @@ contains
         if (allocated(error)) return
 
         call configure_options(options, 200)
-        call solve_bicgstab(operator, rhs, hybrid_solution, options, &
+        call solve_bicgstab(operator, rhs, solution, options, &
             workspace, result)
-        call assert_result_success(result, "hybrid TriIso solver failed", error)
+        call assert_result_success(result, "TriIso BiCGSTAB solver failed", error)
         if (allocated(error)) return
-
-        call assert_solution(hybrid_solution, legacy_solution, check_tolerance(), &
-            "hybrid TriIso result differs from legacy", error)
+        call assert_solution(solution, reference, check_tolerance(), &
+            "TriIso BiCGSTAB solution mismatch", error)
         if (allocated(error)) return
-        call assert_dense_residual(matrix, hybrid_solution, rhs, check_tolerance(), &
-            "hybrid TriIso residual too large", error)
-    end subroutine hybrid_triiso_legacy_parity
+        call assert_dense_residual(matrix, solution, rhs, check_tolerance(), &
+            "TriIso BiCGSTAB residual too large", error)
+    end subroutine bicgstab_triiso_known_solution
 
     subroutine hybrid_preconditioner_variants(error)
         type(error_type), allocatable, intent(out) :: error
@@ -382,8 +357,6 @@ contains
     end subroutine hybrid_heptadiagonal_operator
 
     subroutine hybrid_eqtri_operator(error)
-        use BiCGSTAB_Algorithm, only : BiCGSTAB_EqTri
-
         type(error_type), allocatable, intent(out) :: error
 
         integer, parameter :: n_x = 3
@@ -391,12 +364,11 @@ contains
         integer, parameter :: n = n_x*n_y
         real(prec), target :: a(n), b(n), c(n), d(n), e(n)
         real(prec) :: matrix(n,n), rhs(n), reference(n), solution(n)
-        real(prec) :: legacy_solution(n)
         type(banded_operator_t) :: operator
         type(bicgstab_options_t) :: options
         type(bicgstab_result_t) :: result
         type(bicgstab_workspace_t) :: workspace
-        integer :: legacy_info, row, status
+        integer :: row, status
 
         a = -0.35_prec
         b = 4.5_prec
@@ -423,13 +395,6 @@ contains
         end do
         rhs = matmul(matrix, reference)
         solution = 0.0_prec
-        legacy_solution = 0.0_prec
-
-        call BiCGSTAB_EqTri(n_x, n_y, a, b, c, d, e, rhs, &
-            legacy_solution, solver_tolerance(), 200, legacy_info)
-        call check(error, legacy_info, 0, &
-            message="[SYSTEM] TEST ERROR: legacy EqTri solver failed")
-        if (allocated(error)) return
 
         call operator%bind_eqtri(n_x, a, b, c, d, e, status)
         call check(error, status, 0, &
@@ -439,9 +404,6 @@ contains
         call solve_bicgstab(operator, rhs, solution, options, workspace, result)
         call assert_preconditioned_solution("EqTri", result, matrix, solution, &
             rhs, reference, error)
-        if (allocated(error)) return
-        call assert_solution(solution, legacy_solution, check_tolerance(), &
-            "hybrid EqTri result differs from legacy", error)
     end subroutine hybrid_eqtri_operator
 
     subroutine hybrid_initial_solution_and_failures(error)

@@ -245,7 +245,7 @@ module Service_Fcns
                 real(prec), intent(in) :: dx_gh, dy_gh, dl_input, dx_input
 
                 ! Outputs
-                type(Options_Data), intent(out) :: Opt_gl
+                type(Options_Data), intent(inout) :: Opt_gl
                 type(Figure), allocatable, intent(out) :: Elem_CMFD(:)
                 type(GL_geom), allocatable, intent(out) :: GL_Mesh(:)
                 type(GL_coeff), allocatable, intent(out) :: GL_Param(:)

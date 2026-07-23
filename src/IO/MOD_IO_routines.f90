@@ -1,7 +1,24 @@
 module IO_module
     
+    ! Available to outside:
+    ! ---> output_dir = directory for the output
+    ! ---> debug_mark = file mark for debug   
+    ! ---> output_mark = file mark for output
+    ! ---> file_type = file format
+    !           
+    ! -----> trim(output_dir)//trim(debug_mark)//trim(filename)//trim(file_type)
+    !
+    !
+    ! ---> output_files_t = derived type skeleton for file opening / closing
+    ! ---> files = global variable for file opening / closing
+    ! ---> write_file = interface for line-writing
+    !      call write_file(ID, values, format_string) for int / float
+    !      call write_file(ID, message) for char
+    ! ---> format_builder = interface for building a format, custom or standard
+    !      format_var = format_builder(values, 'custom_format')
+
     use, intrinsic :: iso_fortran_env, only: output_unit, error_unit
-    !use Variables, only :  
+    use precision_kinds, only: prec
     
         implicit none
 
@@ -46,13 +63,35 @@ module IO_module
     end type
 
     type(output_files_t), public :: files
+
+    interface write_file
+        module procedure write_blank_line
+        module procedure write_text_proc
+        module procedure write_text_vector_proc
+        module procedure write_real_scalar_proc
+        module procedure write_real_vector_proc
+        module procedure write_real_matrix_proc
+        module procedure write_integer_scalar_proc
+        module procedure write_integer_vector_proc
+    end interface write_file
+
+    interface format_builder
+        module procedure format_builder_text
+        module procedure format_builder_text_vector
+        module procedure format_builder_real_scalar
+        module procedure format_builder_real_vector
+        module procedure format_builder_real_matrix
+        module procedure format_builder_integer_scalar
+        module procedure format_builder_integer_vector
+    end interface format_builder
+
+    public :: write_file, format_builder
     
     contains
 
         subroutine open_file_main(this, output__is_enabled, debug__is_enabled)
             class(output_files_t), intent(inout) :: this
             logical, intent(in) :: output__is_enabled, debug__is_enabled
-            logical :: condition
 
             call file_ID_clear(this)
             if (output__is_enabled) call open_output_files_t(this)
@@ -281,7 +320,7 @@ module IO_module
             end select
         end subroutine write_log_header
 
-        subroutine close_file_main(this, output__is_enabled, debug__is_enabled) 
+        subroutine close_file_main(this, output__is_enabled, debug__is_enabled)
 	        class(output_files_t), intent(inout) :: this
             logical, intent(in) :: output__is_enabled, debug__is_enabled
     
@@ -315,15 +354,242 @@ module IO_module
             end if
         
         end subroutine close_file_main
-    
         
-        !subroutine write_file(this, out_dest)
-        !    class(output_files_t), intent(in) :: this
-        !    character(len = *), intent(in) :: format_char
-        !
-        !        
-        !    write(this%log, format_char) message
-        !
-        !end subroutine write_file
-                
+        
+        
+
+
+        subroutine write_blank_line(ID)
+            integer, intent(in) :: ID
+
+            write(ID, *) 
+            
+        end subroutine write_blank_line
+
+        subroutine write_text_proc(ID, message, format_string)
+            integer, intent(in) :: ID
+            character(len=*), intent(in) :: message
+            character(len=*), intent(in), optional :: format_string
+
+            if (present(format_string)) then
+                write(ID, format_string) trim(message)
+            else
+                write(ID, '(A)') trim(message)
+            end if
+        end subroutine write_text_proc
+
+        subroutine write_text_vector_proc(ID, messages, format_string)
+            integer, intent(in) :: ID
+            character(len=*), intent(in) :: messages(:)
+            character(len=*), intent(in), optional :: format_string
+            integer :: i
+
+            if (present(format_string)) then
+                write(ID, format_string) (trim(messages(i)), i=1, size(messages))
+            else
+                write(ID, '(*(A,1X))') (trim(messages(i)), i=1, size(messages))
+            end if
+
+        end subroutine write_text_vector_proc
+        
+        subroutine write_integer_scalar_proc(ID, value, format_string)
+            integer, intent(in) :: ID
+            integer, intent(in) :: value
+            character(len=*), intent(in), optional :: format_string
+
+            if (present(format_string)) then
+                write(ID, format_string) value
+            else
+                write(error_unit, '(A)') "[SYSTEM] Missing format variables"
+                write(output_unit, '(A)') "[SYSTEM] Missing format variables"
+                error stop
+            end if
+
+        end subroutine write_integer_scalar_proc
+
+        subroutine write_integer_vector_proc(ID, values, format_string)
+            integer, intent(in) :: ID
+            integer, intent(in) :: values(:)
+            character(len=*), intent(in), optional :: format_string
+
+            if (present(format_string)) then
+                write(ID, format_string) values
+            else
+                write(error_unit, '(A)') "[SYSTEM] Missing format variables"
+                write(output_unit, '(A)') "[SYSTEM] Missing format variables"
+                error stop
+            end if
+
+        end subroutine write_integer_vector_proc
+
+        subroutine write_real_scalar_proc(ID, value, format_string)
+            integer, intent(in) :: ID
+            real(prec), intent(in) :: value
+            character(len=*), intent(in), optional :: format_string
+
+            if (present(format_string)) then
+                write(ID, format_string) value
+            else
+                write(error_unit, '(A)') "[SYSTEM] Missing format variables"
+                write(output_unit, '(A)') "[SYSTEM] Missing format variables"
+                error stop
+            end if
+
+        end subroutine write_real_scalar_proc
+
+        subroutine write_real_vector_proc(ID, values, format_string)
+            integer, intent(in) :: ID
+            real(prec), intent(in) :: values(:)
+            character(len=*), intent(in), optional :: format_string
+
+            if (present(format_string)) then
+                write(ID, format_string) values
+            else
+                write(error_unit, '(A)') "[SYSTEM] Missing format variables"
+                write(output_unit, '(A)') "[SYSTEM] Missing format variables"
+                error stop
+            end if
+
+        end subroutine write_real_vector_proc
+
+        subroutine write_real_matrix_proc(ID, values, format_string)
+            integer, intent(in) :: ID
+            real(prec), intent(in) :: values(:,:)
+            character(len = *), intent(in), optional :: format_string
+            
+            integer :: i
+            
+            do i = 1, size(values, 1)
+                if (present(format_string)) then
+                    write(ID, format_string) values(i,:)
+                else
+                    write(error_unit, '(A)') "[SYSTEM] Missing format variables"
+                    write(output_unit, '(A)') "[SYSTEM] Missing format variables"
+                    error stop
+                end if
+            end do
+        end subroutine write_real_matrix_proc
+        
+
+
+        
+
+        function format_builder_text(value, edit_descriptor) result(format_string)
+            character(len=*), intent(in) :: value
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+
+            format_string = scalar_format('A', edit_descriptor)
+
+        end function format_builder_text
+
+        function format_builder_text_vector(values, edit_descriptor) result(format_string)
+            character(len=*), intent(in) :: values(:)
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+
+            format_string = repeated_format(size(values), 'A', edit_descriptor)
+
+        end function format_builder_text_vector
+
+        function format_builder_integer_scalar(value, edit_descriptor) result(format_string)
+            integer, intent(in) :: value
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+
+            format_string = scalar_format('I0', edit_descriptor)
+
+        end function format_builder_integer_scalar
+
+        function format_builder_integer_vector(values, edit_descriptor) result(format_string)
+            integer, intent(in) :: values(:)
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+
+            format_string = repeated_format(size(values), 'I0', edit_descriptor)
+
+        end function format_builder_integer_vector
+
+        function format_builder_real_scalar(value, edit_descriptor) result(format_string)
+            real(prec), intent(in) :: value
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+
+            format_string = scalar_format('ES21.13', edit_descriptor)
+
+        end function format_builder_real_scalar
+
+        function format_builder_real_vector(values, edit_descriptor) result(format_string)
+            real(prec), intent(in) :: values(:)
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+
+            format_string = repeated_format(size(values), 'ES21.13', edit_descriptor)
+
+        end function format_builder_real_vector
+
+        function format_builder_real_matrix(values, edit_descriptor) result(format_string)
+            real(prec), intent(in) :: values(:,:)
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+
+            format_string = repeated_format(size(values, 2), 'ES21.13', edit_descriptor)
+
+        end function format_builder_real_matrix
+
+        function scalar_format(default_descriptor, edit_descriptor) result(format_string)
+            character(len=*), intent(in) :: default_descriptor
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+            character(len=:), allocatable :: descriptor
+
+            descriptor = default_descriptor
+            if (present(edit_descriptor)) descriptor = trim(edit_descriptor)
+
+            if (len_trim(descriptor) == 0) then
+                write(error_unit, '(A)') '[SYSTEM] IO/MOD_IO_Routines.f90/scalar_format:'// &
+                                       ' The edit descriptor cannot be empty'
+                write(output_unit, '(A)')'[SYSTEM] IO/MOD_IO_Routines.f90/scalar_format:'// &
+                                       ' The edit descriptor cannot be empty'
+                error stop 
+            end if
+
+            format_string = '(' // trim(descriptor) // ')'
+
+        end function scalar_format
+
+        function repeated_format(repetition_count, default_descriptor, edit_descriptor) &
+            result(format_string)
+            integer, intent(in) :: repetition_count
+            character(len=*), intent(in) :: default_descriptor
+            character(len=*), intent(in), optional :: edit_descriptor
+            character(len=:), allocatable :: format_string
+            character(len=:), allocatable :: descriptor
+            character(len=32) :: count_string
+
+            if (repetition_count <= 0) then
+                write(error_unit, '(A)') '[SYSTEM] IO/MOD_IO_Routines.f90/repeated_format:'// &
+                                       ' Cannot build a format for an empty array dimension'
+                write(output_unit, '(A)')'[SYSTEM] IO/MOD_IO_Routines.f90/repeated_format:'// &
+                                       ' Cannot build a format for an empty array dimension'
+                error stop 
+            end if
+
+            descriptor = default_descriptor
+            if (present(edit_descriptor)) descriptor = trim(edit_descriptor)
+
+            if (len_trim(descriptor) == 0) then                
+                write(error_unit, '(A)') '[SYSTEM] IO/MOD_IO_Routines.f90/repeated_format:'// &
+                                       ' The edit descriptor cannot be empty'
+                write(output_unit, '(A)')'[SYSTEM] IO/MOD_IO_Routines.f90/repeated_format:'// &
+                                       ' The edit descriptor cannot be empty'
+                error stop 
+            end if
+
+            write(count_string, '(I0)') repetition_count
+            format_string = '(' // trim(count_string) // '(' // trim(descriptor) // ',1X))'
+
+        end function repeated_format
+
+
 end module IO_module
